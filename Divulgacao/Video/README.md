@@ -1,4 +1,3 @@
-# Divulgação: Vídeo do Projeto
+# Divulgação — Vídeo do Projeto
 
-Nesta pasta inclua arquivos de vídeo produzidos para divulgação do projeto e seus resutados.
-
+Esta pasta contém o vídeo oficial da Pré-Banca (Atividade A6), produzido para apresentação e divulgação do andamento do projeto.
