@@ -19,4 +19,5 @@ Os artefatos aqui organizados complementam a documentação oficial (Documento d
 - **DiagramaArquitetura.png**
 - **DiagramaEstados.png**
 - **ModeloDeDados.png**
+- **Personas**
 - **Projeto-PreBanca_Atividade_A6.pdf**
