@@ -31,7 +31,6 @@ O painel administrativo permitirá que gestores e vendedores visualizem métrica
 
 A arquitetura prevista é composta pelos seguintes módulos:
 
----
 
 ## 1. Chatbot Core + Integração WhatsApp Cloud API
 
