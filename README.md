@@ -40,7 +40,6 @@ A arquitetura prevista é composta pelos seguintes módulos:
 - Encaminha para atendimento humano quando necessário  
 - Envia mensagens de volta ao cliente via **Graph API**  
 
----
 
 ## 2. Backend da Aplicação (API Backend + Chatbot Core)
 
@@ -50,7 +49,6 @@ A arquitetura prevista é composta pelos seguintes módulos:
 - Integração oficial com a **WhatsApp Cloud API**  
 - Aplica regras de negócio e controla o fluxo conversacional  
 
----
 
 ## 3. Banco de Dados — Supabase/Postgres
 
@@ -59,7 +57,6 @@ A arquitetura prevista é composta pelos seguintes módulos:
 - Guarda configurações e regras de cobrança  
 - Acesso exclusivo via camada de persistência do backend  
 
----
 
 ## 4. Painel Administrativo Web
 
