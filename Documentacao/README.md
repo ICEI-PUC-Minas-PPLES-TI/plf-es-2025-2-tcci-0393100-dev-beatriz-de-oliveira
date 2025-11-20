@@ -8,6 +8,5 @@ Estão incluídos:
 - **Documento de Viabilidade**
 - **Documentação de Projeto**
 - **Memorial**
-- **Relatórios complementares e materiais exigidos pela PROEX ou pela coordenação**
 
 Esses arquivos registram o planejamento, os requisitos, as decisões técnicas e a evolução do projeto durante o TCC, servindo como base formal para acompanhamento e avaliação.
