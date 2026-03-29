@@ -1,4 +1,4 @@
-export type LeadStatus = "NOVO" | "ENCAMINHADO_HUMANO" | "EM_CONTATO" | "CONVERTIDO" | "PERDIDO";
+﻿export type LeadStatus = "NOVO" | "ENCAMINHADO_HUMANO" | "EM_CONTATO" | "CONVERTIDO" | "PERDIDO";
 export type PromocaoTipo = "PROMOCAO" | "DESTAQUE";
 export type PedidoStatus = "PAGO" | "ATRASADO" | "PENDENTE" | "CANCELADO";
 export type AtendimentoStatus = "ATIVO" | "PENDENTE" | "ENCERRADO";
@@ -24,6 +24,11 @@ export interface Lead {
   data_criacao: string;
 }
 
+export interface LeadFilters {
+  status?: LeadStatus;
+  search?: string;
+}
+
 export interface Promocao {
   id: number;
   produto: string;
@@ -37,6 +42,7 @@ export interface Promocao {
 
 export interface Pedido {
   id: number;
+  numero_pedido: string;
   cliente: string;
   telefone_cliente: string;
   valor_total: string;
@@ -54,6 +60,30 @@ export interface BillingRule {
   dias_atraso_max: string;
 }
 
+export interface BillingRoutineEntry {
+  pedido_id: number;
+  numero_pedido: string;
+  cliente: string;
+  telefone_cliente: string;
+  valor_total: string;
+  data_vencimento: string;
+  dias_atraso: number;
+  status_original: PedidoStatus;
+  status_final: PedidoStatus;
+  mensagem: string;
+}
+
+export interface BillingRoutineRun {
+  id: number;
+  executado_em: string;
+  referencia_em: string;
+  regra_ativa: boolean;
+  elegiveis: number;
+  processados: number;
+  ignorados: number;
+  itens: BillingRoutineEntry[];
+}
+
 export interface Atendimento {
   id: number;
   cliente: string;
@@ -68,6 +98,31 @@ export interface Mensagem {
   tipo: MensagemTipo;
   conteudo: string;
   horario: string;
+  remetente?: string;
+}
+
+export interface DashboardTopProduto {
+  id: number;
+  nome: string;
+  preco: string;
+  imagem: string;
+  vendas: number;
+}
+
+export interface DashboardAtendimentoRecente {
+  id: number;
+  cliente: string;
+  mensagem: string;
+  hora: string;
+}
+
+export interface DashboardSummary {
+  pedidosPendentes: number;
+  atendimentosAtivos: number;
+  produtosDisponiveis: number;
+  pedidosMes: number;
+  topProdutos: DashboardTopProduto[];
+  atendimentosRecentes: DashboardAtendimentoRecente[];
 }
 
 export interface MetricaVendaDia {
@@ -85,4 +140,5 @@ export interface MetricaTopProduto {
 export interface Metricas {
   vendasPorDia: MetricaVendaDia[];
   topProdutos: MetricaTopProduto[];
+  novosClientes: number;
 }
