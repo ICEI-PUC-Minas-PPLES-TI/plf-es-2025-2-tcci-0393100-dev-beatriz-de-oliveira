@@ -1,6 +1,6 @@
 [![Open in Codespaces](https://classroom.github.com/assets/launch-codespace-2972f46106e565e64193e422d61a12cf1da4916b45550586e14ef0a7c637dd04.svg)](https://classroom.github.com/open-in-codespaces?assignment_repo_id=20563286)
 
-# TCC I — Chatbot de Atendimento via WhatsApp para a Eletro Rádio Esperança
+# TCC — Chatbot de Atendimento via WhatsApp para a Eletro Rádio Esperança
 
 Este projeto tem como objetivo desenvolver um **chatbot de atendimento via WhatsApp**, totalmente integrado à **WhatsApp Cloud API** e conectado a um **painel administrativo web**.  
 A solução busca **automatizar o atendimento digital** da loja *Eletro Rádio Esperança*, oferecendo respostas consistentes sobre produtos e promoções, reduzindo a sobrecarga da equipe de vendas e possibilitando o **envio automático de lembretes de cobrança**.
