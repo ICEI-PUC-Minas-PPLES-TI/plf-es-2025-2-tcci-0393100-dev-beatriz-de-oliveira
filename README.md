@@ -6,6 +6,18 @@ Este projeto tem como objetivo desenvolver um **chatbot de atendimento via Whats
 
 A solução automatiza o atendimento digital da loja *Eletro Rádio Esperança*, fornecendo respostas sobre produtos e promoções, reduzindo a sobrecarga da equipe de vendas e permitindo a **geração de leads e automação de processos comerciais**.
 
+--- 
+## 👤 Integrante da Equipe 
+- **Beatriz de Oliveira Silveira**
+
+--- 
+
+## 👨‍🏫 Professores Responsáveis 
+- **Cleiton Silva Tavares**
+- **Danilo de Quadros Maia Filho**
+- **Leonardo Vilela Cardoso**
+- **Raphael Ramos Dias Costa**
+
 ---
 
 ## 🚀 Tecnologias Utilizadas
