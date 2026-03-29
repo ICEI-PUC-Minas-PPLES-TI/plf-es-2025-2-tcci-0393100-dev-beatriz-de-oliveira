@@ -2,75 +2,45 @@
 
 # TCC — Chatbot de Atendimento via WhatsApp para a Eletro Rádio Esperança
 
-Este projeto tem como objetivo desenvolver um **chatbot de atendimento via WhatsApp**, totalmente integrado à **WhatsApp Cloud API** e conectado a um **painel administrativo web**.  
-A solução busca **automatizar o atendimento digital** da loja *Eletro Rádio Esperança*, oferecendo respostas consistentes sobre produtos e promoções, reduzindo a sobrecarga da equipe de vendas e possibilitando o **envio automático de lembretes de cobrança**.
+Este projeto tem como objetivo desenvolver um **chatbot de atendimento via WhatsApp**, integrado à **WhatsApp Cloud API** e a um **painel administrativo web**.
 
-O chatbot será implementado diretamente no **backend próprio**, que recebe mensagens por webhooks enviados pela **WhatsApp Cloud API** e envia respostas utilizando os endpoints oficiais da WhatsApp Cloud API 
-O sistema utilizará **Supabase/Postgres** como banco de dados relacional para armazenar catálogo, leads, métricas e configurações de cobrança.
-
-O painel administrativo permitirá que gestores e vendedores visualizem métricas, atualizem produtos, gerenciem leads e configurem mensagens de cobrança.
+A solução automatiza o atendimento digital da loja *Eletro Rádio Esperança*, fornecendo respostas sobre produtos e promoções, reduzindo a sobrecarga da equipe de vendas e permitindo a **geração de leads e automação de processos comerciais**.
 
 ---
 
-## 👤 Integrante da Equipe
+## 🚀 Tecnologias Utilizadas
 
-- **Beatriz de Oliveira Silveira**
-
----
-
-## 👨‍🏫 Professores Responsáveis
-
-- **Cleiton Silva Tavares**  
-- **Danilo de Quadros Maia Filho**  
-- **Leonardo Vilela Cardoso**  
-- **Raphael Ramos Dias Costa**
+- **Node.js** — runtime do backend  
+- **TypeScript** — tipagem e organização do código  
+- **Fastify** — framework HTTP  
+- **PostgreSQL (Supabase)** — banco de dados relacional  
+- **React + Vite** — painel administrativo  
+- **WhatsApp Cloud API** — canal de comunicação  
 
 ---
 
-# 🧩 Arquitetura da Solução
+## 🧩 Arquitetura da Solução
 
-A arquitetura prevista é composta pelos seguintes módulos:
+O sistema é dividido em quatro principais módulos:
 
+### 1. Chatbot Core + Integração WhatsApp
+- Recebe mensagens via webhook  
+- Processa intenções (produtos, promoções, atendimento humano)  
+- Mantém estado da conversa  
+- Encaminha para vendedor quando necessário  
 
-## 1. Chatbot Core + Integração WhatsApp Cloud API
+### 2. Backend (API + Chatbot Core)
+- Gerencia produtos, leads e regras de negócio  
+- Expõe endpoints REST  
+- Controla o fluxo conversacional  
+- Integra com o banco de dados  
 
-- Recebe mensagens por meio de webhooks enviados pela Meta  
-- Processa regras de atendimento no **Chatbot Core**  
-- Consulta o catálogo e gera respostas automáticas  
-- Encaminha para atendimento humano quando necessário  
-- Envia mensagens de volta ao cliente via **Graph API**  
+### 3. Banco de Dados (Supabase/Postgres)
+- Armazena produtos, clientes, leads e mensagens  
+- Garante consistência dos dados  
+- Base relacional do sistema  
 
-
-## 2. Backend da Aplicação (API Backend + Chatbot Core)
-
-- Desenvolvido especificamente para o projeto  
-- Gerencia catálogo, leads, métricas, cobranças e interações  
-- Expõe endpoints REST consumidos pelo painel administrativo  
-- Integração oficial com a **WhatsApp Cloud API**  
-- Aplica regras de negócio e controla o fluxo conversacional  
-
-
-## 3. Banco de Dados — Supabase/Postgres
-
-- Armazena catálogo de produtos  
-- Mantém registro de leads, histórico de interações e métricas  
-- Guarda configurações e regras de cobrança  
-- Acesso exclusivo via camada de persistência do backend  
-
-
-## 4. Painel Administrativo Web
-
-- Interface para gestão de catálogo e promoções  
-- Visualização de métricas básicas  
-- Administração de leads  
-- Exportação de dados em CSV  
-- Configuração e disparo de lembretes de cobrança  
-- **Não acessa o banco diretamente**: utiliza somente a API Backend  
-
----
-
-> Instruções completas de configuração de ambiente, variáveis, endpoints e execução serão adicionadas nas próximas etapas do projeto.
-
-
-
-
+### 4. Painel Administrativo
+- Gestão de produtos (CRUD)  
+- Visualização de leads  
+- Controle operacional do sistema  
