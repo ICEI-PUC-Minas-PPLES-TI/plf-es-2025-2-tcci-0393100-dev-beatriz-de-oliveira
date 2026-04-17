@@ -1,0 +1,17 @@
+node_modules/
+dist/
+build/
+.cache/
+
+.env
+.env.*
+!.env.example
+
+*.log
+
+.vscode/
+.idea/
+.codex_tmp/
+
+.DS_Store
+Thumbs.db

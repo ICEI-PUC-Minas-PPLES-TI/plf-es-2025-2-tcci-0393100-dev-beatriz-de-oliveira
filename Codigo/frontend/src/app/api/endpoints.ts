@@ -1,0 +1,16 @@
+export const API_ENDPOINTS = {
+  login: "/auth/login",
+  dashboardSummary: "/dashboard/summary",
+  produtos: "/products",
+  promotions: "/promotions",
+  leads: "/leads",
+  metricas: "/metrics",
+  billingRules: "/billing-rules",
+  billingOrders: "/billing-rules/orders",
+  billingRuns: "/billing-rules/runs",
+  whatsappConversations: "/whatsapp/conversations",
+  whatsappMessages: (atendimentoId: number) => `/whatsapp/messages/${atendimentoId}`,
+  whatsappSend: "/whatsapp/send",
+  whatsappConversationStatus: (atendimentoId: number) => `/whatsapp/conversations/${atendimentoId}/status`,
+  webhooksWhatsApp: "/webhooks/whatsapp",
+} as const;
