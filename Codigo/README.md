@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Eletro Rádio Esperança - Painel Administrativo
 
 Painel administrativo moderno e comercial para loja de móveis e eletrodomésticos.
