@@ -1,0 +1,10 @@
+create index if not exists idx_clientes_telefone on public.clientes(telefone);
+create index if not exists idx_leads_telefone on public.leads(telefone);
+create index if not exists idx_atendimentos_cliente_id on public.atendimentos(cliente_id);
+create index if not exists idx_atendimentos_lead_id on public.atendimentos(lead_id);
+create index if not exists idx_atendimentos_status on public.atendimentos(status);
+create index if not exists idx_atendimentos_estado_conversa on public.atendimentos(estado_conversa);
+create index if not exists idx_mensagens_atendimento_id on public.mensagens(atendimento_id);
+create unique index if not exists idx_mensagens_whatsapp_message_id on public.mensagens(whatsapp_message_id);
+create index if not exists idx_produtos_categoria on public.produtos(categoria);
+create index if not exists idx_pedidos_cliente_id on public.pedidos(cliente_id);

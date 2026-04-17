@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Eletro Rádio Esperança - Painel Administrativo
 
 Painel administrativo moderno e comercial para loja de móveis e eletrodomésticos.
@@ -243,3 +244,8 @@ As seguintes rotas de API estão prontas para integração:
 ---
 
 Desenvolvido com 💚 para o mercado de móveis e eletrodomésticos
+=======
+# Código do Projeto
+
+Mantenha neste diretório todo o código do projeto. Se necessário, descreva neste arquivo aspectos relevantes da estrutura de diretórios criada para organização do código.
+>>>>>>> 3cf5722b6ef8839b7a9f3f22948266b735e76a63

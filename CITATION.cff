@@ -1,0 +1,42 @@
+cff-version: 1.2.0
+message: "Please cite this software using the metadata below."
+title: "Chatbot de Atendimento da Eletro Rádio Esperança"
+
+authors:
+  # Autora do projeto
+  - family-names: "Silveira"
+    given-names: "Beatriz de Oliveira"
+    affiliation: "PUC Minas"
+
+  # Orientadores e professores mencionados no TCC
+  - family-names: "Maia"
+    given-names: "Danilo de Quadros"
+    name-suffix: "Professor"
+    affiliation: "PUC Minas"
+
+  - family-names: "Cardoso"
+    given-names: "Leonardo Vilela"
+    name-suffix: "Professor"
+    affiliation: "PUC Minas"
+
+  - family-names: "Costa"
+    given-names: "Raphael Ramos Dias"
+    name-suffix: "Professor"
+    affiliation: "PUC Minas"
+
+  - family-names: "Tavares"
+    given-names: "Cleiton Silva"
+    name-suffix: "Professor"
+    affiliation: "PUC Minas"
+
+keywords:
+  - "chatbot"
+  - "whatsapp"
+  - "engenharia de software"
+  - "atendimento automatizado"
+  - "PUC Minas"
+
+repository-code: "https://github.com/ICEI-PUC-Minas-PPLES-TI/plf-es-2025-2-tcci-0393100-dev-beatriz-de-oliveira"
+license: "CC-BY-4.0"
+version: "1.0.0"
+date-released: "2025-11-18"
