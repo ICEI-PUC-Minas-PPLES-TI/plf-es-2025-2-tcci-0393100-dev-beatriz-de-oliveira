@@ -18,6 +18,7 @@ import {
 import type {
   Atendimento,
   BillingRule,
+  ConversationChannel,
   DashboardSummary,
   Lead,
   LeadStatus,
@@ -246,6 +247,19 @@ export const adminDataService = {
       () => MENSAGENS,
       async () => (await httpClient.get<ApiListResponse<Mensagem>>(API_ENDPOINTS.whatsappMessages(atendimentoId))).data,
     ),
+
+  listConversations: (channel?: ConversationChannel | "todos") =>
+    (async () => {
+      const query = new URLSearchParams();
+      if (channel && channel !== "todos") {
+        query.set("channel", channel);
+      }
+      const suffix = query.toString() ? `?${query.toString()}` : "";
+      return (await httpClient.get<ApiListResponse<Atendimento>>(`${API_ENDPOINTS.conversations}${suffix}`)).data;
+    })(),
+
+  listConversationMessages: (conversationId: number) =>
+    (async () => (await httpClient.get<ApiListResponse<Mensagem>>(API_ENDPOINTS.conversationMessages(conversationId))).data)(),
 
   updateAtendimentoStatus: (atendimentoId: number, status: Atendimento["status"]) =>
     getMockOrApiData<Atendimento>(

@@ -54,6 +54,7 @@ export async function buildServer() {
         { name: "Leads", description: "CRM e acompanhamento de leads" },
         { name: "Metrics", description: "Metricas e desempenho comercial" },
         { name: "Billing", description: "Regras, pedidos e rotina de cobranca" },
+        { name: "Conversations", description: "Inbox unificado de conversas por canal" },
         { name: "Telegram Webhook", description: "Recebimento de eventos do Telegram" },
         { name: "WhatsApp Webhook", description: "Recebimento e verificacao de eventos do WhatsApp" },
         { name: "WhatsApp Inbox", description: "Inbox e gestao de conversas do WhatsApp" },
@@ -96,25 +97,11 @@ export async function buildServer() {
 
 async function start() {
   const app = await buildServer();
-  const address = await app.listen({
+  await app.listen({
     host: env.HOST,
     port: env.PORT,
   });
-  app.log.info(
-    {
-      address,
-      host: env.HOST,
-      port: env.PORT,
-      nodeEnv: env.NODE_ENV,
-      whatsappProvider: env.WHATSAPP_PROVIDER,
-      healthPath: "/health",
-      telegramWebhookPath: env.TELEGRAM_WEBHOOK_PATH,
-      webhookPath: "/webhooks/whatsapp",
-    },
-    "Backend started successfully",
-  );
   container.dailyBillingJob.start();
-  app.log.info("Daily billing job initialized");
 }
 
 start().catch((error) => {

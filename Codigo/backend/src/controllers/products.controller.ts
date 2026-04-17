@@ -4,17 +4,8 @@ import { idParamSchema, productBodySchema, productUpdateBodySchema } from "../sc
 import { AppError } from "../utils/app-error.js";
 import { parseWithSchema } from "../utils/validation.js";
 
-export async function listProductsController(request: FastifyRequest, reply: FastifyReply) {
-  const query = request.query as { search?: string; limit?: string | number } | undefined;
-  const rawUrl = new URL(request.url, "http://localhost");
-  const search = query?.search ?? rawUrl.searchParams.get("search") ?? undefined;
-  const rawLimit = query?.limit ?? rawUrl.searchParams.get("limit") ?? undefined;
-  const limit = rawLimit === undefined || rawLimit === null ? undefined : Number(rawLimit);
-
-  const data = await container.productsService.list({
-    search,
-    limit: Number.isFinite(limit) ? limit : undefined,
-  });
+export async function listProductsController(_request: FastifyRequest, reply: FastifyReply) {
+  const data = await container.productsService.list();
   return reply.send({ data });
 }
 
@@ -46,4 +37,3 @@ export async function deleteProductController(request: FastifyRequest, reply: Fa
 
   return reply.code(204).send();
 }
-

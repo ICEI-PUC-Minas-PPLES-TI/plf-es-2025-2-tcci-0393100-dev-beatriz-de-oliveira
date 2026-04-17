@@ -1,6 +1,6 @@
 import { pool } from "../../config/database.js";
 import type { Produto } from "../../types/domain.js";
-import type { ProductListOptions, ProductsRepository } from "../products.repository.js";
+import type { ProductsRepository } from "../products.repository.js";
 
 type ProductRow = {
   produto_id: number;
@@ -8,7 +8,6 @@ type ProductRow = {
   descricao: string;
   preco: string | number;
   disponibilidade: boolean;
-  quantidade?: number | string | null;
   categoria?: string | null;
   imagem?: string | null;
 };
@@ -16,39 +15,20 @@ type ProductRow = {
 type OptionalColumns = {
   categoria: boolean;
   imagem: boolean;
-  quantidade: boolean;
 };
 
 export class PostgresProductsRepository implements ProductsRepository {
   private optionalColumnsPromise?: Promise<OptionalColumns>;
 
-  async findAll(options: ProductListOptions = {}): Promise<Produto[]> {
+  async findAll(): Promise<Produto[]> {
     const columns = await this.getOptionalColumns();
-    const values: unknown[] = [];
-    const where: string[] = [];
-
-    const search = options.search?.trim();
-    if (search) {
-      values.push(`%${search}%`);
-      where.push(`nome ILIKE $${values.length}`);
-    }
-
-    let limitClause = "";
-    if (options.limit !== undefined) {
-      const safeLimit = Math.min(100, Math.max(1, Math.trunc(options.limit)));
-      values.push(safeLimit);
-      limitClause = `LIMIT $${values.length}`;
-    }
-
     const query = `
       SELECT ${this.buildSelectColumns(columns)}
       FROM produtos
-      ${where.length > 0 ? `WHERE ${where.join(" AND ")}` : ""}
-      ORDER BY nome ASC, produto_id ASC
-      ${limitClause}
+      ORDER BY produto_id ASC
     `;
 
-    const result = await pool.query<ProductRow>(query, values);
+    const result = await pool.query<ProductRow>(query);
     return result.rows.map((row) => this.mapRowToDomain(row, columns));
   }
 
@@ -129,7 +109,7 @@ export class PostgresProductsRepository implements ProductsRepository {
           AND table_name = 'produtos'
           AND column_name = ANY($1::text[])
       `,
-      [["categoria", "imagem", "quantidade"]],
+      [["categoria", "imagem"]],
     );
 
     const available = new Set(result.rows.map((row) => row.column_name));
@@ -137,7 +117,6 @@ export class PostgresProductsRepository implements ProductsRepository {
     return {
       categoria: available.has("categoria"),
       imagem: available.has("imagem"),
-      quantidade: available.has("quantidade"),
     };
   }
 
@@ -148,7 +127,6 @@ export class PostgresProductsRepository implements ProductsRepository {
       "descricao",
       "preco",
       "disponibilidade",
-      columns.quantidade ? "quantidade" : "0::int AS quantidade",
       columns.categoria ? "categoria" : "NULL::text AS categoria",
       columns.imagem ? "imagem" : "NULL::text AS imagem",
     ];
@@ -163,7 +141,6 @@ export class PostgresProductsRepository implements ProductsRepository {
       categoria: columns.categoria ? row.categoria ?? "Sem categoria" : "Sem categoria",
       descricao: row.descricao,
       preco: String(row.preco),
-      quantidade: Number(row.quantidade ?? 0),
       disponivel: Boolean(row.disponibilidade),
       imagem: columns.imagem ? row.imagem ?? "" : "",
     };
@@ -176,7 +153,6 @@ export class PostgresProductsRepository implements ProductsRepository {
     if (data.descricao !== undefined) payload.descricao = data.descricao;
     if (data.preco !== undefined) payload.preco = data.preco;
     if (data.disponivel !== undefined) payload.disponibilidade = data.disponivel;
-    if (columns.quantidade && data.quantidade !== undefined) payload.quantidade = data.quantidade;
     if (columns.categoria && data.categoria !== undefined) payload.categoria = data.categoria;
     if (columns.imagem && data.imagem !== undefined) payload.imagem = data.imagem;
 

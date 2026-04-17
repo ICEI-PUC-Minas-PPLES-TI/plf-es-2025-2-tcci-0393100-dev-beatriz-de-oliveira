@@ -2,7 +2,7 @@ import { pool } from "../../config/database.js";
 import type { Lead, LeadFilters } from "../../types/domain.js";
 import type { LeadUpsertByPhoneInput, LeadsRepository } from "../leads.repository.js";
 
-type DbLeadStatus = "NOVO" | "INTERESSADO" | "ENCAMINHADO_HUMANO" | "CONVERTIDO" | "ENCERRADO";
+type DbLeadStatus = "NOVO" | "INTERESSADO" | "ENCAMINHADO_HUMANO" | "CONVERTIDO" | "PERDIDO";
 
 type LeadRow = {
   lead_id: string;
@@ -16,14 +16,11 @@ type LeadRow = {
 };
 
 const LEAD_ID_SQL = "abs(hashtext(lead_id::text))";
-const GENERIC_HUMAN_HANDOFF_INTEREST = "solicitou atendimento humano no whatsapp";
 
 function mapDbStatusToDomain(status: DbLeadStatus): Lead["status"] {
   switch (status) {
     case "INTERESSADO":
       return "EM_CONTATO";
-    case "ENCERRADO":
-      return "PERDIDO";
     default:
       return status;
   }
@@ -33,19 +30,9 @@ function mapDomainStatusToDb(status: Lead["status"]): DbLeadStatus {
   switch (status) {
     case "EM_CONTATO":
       return "INTERESSADO";
-    case "PERDIDO":
-      return "ENCERRADO";
     default:
       return status;
   }
-}
-
-function shouldPreserveExistingInterest(existingInterest: string | null, input: LeadUpsertByPhoneInput): boolean {
-  if (!existingInterest?.trim()) {
-    return false;
-  }
-
-  return input.status === "ENCAMINHADO_HUMANO" && input.interest.trim().toLowerCase() === GENERIC_HUMAN_HANDOFF_INTEREST;
 }
 
 export class PostgresLeadsRepository implements LeadsRepository {
@@ -167,10 +154,6 @@ export class PostgresLeadsRepository implements LeadsRepository {
 
     const existingRow = existing.rows[0];
     if (existingRow) {
-      const nextInterest = shouldPreserveExistingInterest(existingRow.interesse_produto, input)
-        ? existingRow.interesse_produto!
-        : input.interest;
-
       const updated = await pool.query<(LeadRow & { numeric_id: number })>(
         `
           UPDATE leads
@@ -182,7 +165,7 @@ export class PostgresLeadsRepository implements LeadsRepository {
           WHERE telefone = $1
           RETURNING ${LEAD_ID_SQL} AS numeric_id, lead_id::text, nome, telefone, interesse_produto, status, origem, criado_em, atualizado_em
         `,
-        [input.phone, input.name ?? null, nextInterest, mapDomainStatusToDb(input.status)],
+        [input.phone, input.name ?? null, input.interest, mapDomainStatusToDb(input.status)],
       );
 
       return this.mapRowToDomain(updated.rows[0]!);

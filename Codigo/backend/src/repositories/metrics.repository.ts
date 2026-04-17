@@ -1,10 +1,5 @@
-﻿import type { Metricas } from "../types/domain.js";
-
-export interface MetricsFilters {
-  startDate?: string;
-  endDate?: string;
-}
+import type { Metricas } from "../types/domain.js";
 
 export interface MetricsRepository {
-  get(filters?: MetricsFilters): Promise<Metricas>;
+  get(): Promise<Metricas>;
 }

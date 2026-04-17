@@ -42,12 +42,6 @@ export class HumanHandoffHandler implements IntentHandler {
         handoffRequested: true,
         awaitingHumanHandoffDecision: false,
         lastShownProducts: [],
-        selectedProductCategory: undefined,
-        productBrowseOffset: 0,
-        productBrowseSearchTerm: undefined,
-        productBrowsePromotionOnly: false,
-        productBrowseMinPrice: undefined,
-        productBrowseMaxPrice: undefined,
       },
     };
   }

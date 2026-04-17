@@ -13,7 +13,6 @@ export type ConversationStage =
   | "IDLE"
   | "MENU_PRINCIPAL"
   | "CONSULTANDO_PRODUTOS"
-  | "AGUARDANDO_CATEGORIA_PRODUTO"
   | "AGUARDANDO_ESCOLHA_PRODUTO"
   | "AGUARDANDO_NOME_CLIENTE"
   | "ENCAMINHADO_HUMANO";
@@ -48,12 +47,6 @@ export interface ChatbotConversationState {
   awaitingHumanHandoffDecision: boolean;
   lastShownProducts: string[];
   selectedProductName?: string;
-  selectedProductCategory?: string;
-  productBrowseOffset?: number;
-  productBrowseSearchTerm?: string;
-  productBrowsePromotionOnly?: boolean;
-  productBrowseMinPrice?: number;
-  productBrowseMaxPrice?: number;
   pendingIntentAfterName?: Extract<ChatbotIntent, "lead_interest" | "human_handoff">;
   pendingInterestSummary?: string;
 }
@@ -89,12 +82,6 @@ export interface ChatbotResponse {
       | "awaitingHumanHandoffDecision"
       | "lastShownProducts"
       | "selectedProductName"
-      | "selectedProductCategory"
-      | "productBrowseOffset"
-      | "productBrowseSearchTerm"
-      | "productBrowsePromotionOnly"
-      | "productBrowseMinPrice"
-      | "productBrowseMaxPrice"
       | "pendingIntentAfterName"
       | "pendingInterestSummary"
     >

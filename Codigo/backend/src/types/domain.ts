@@ -1,8 +1,9 @@
-﻿export type LeadStatus = "NOVO" | "ENCAMINHADO_HUMANO" | "EM_CONTATO" | "CONVERTIDO" | "PERDIDO";
+export type LeadStatus = "NOVO" | "ENCAMINHADO_HUMANO" | "EM_CONTATO" | "CONVERTIDO" | "PERDIDO";
 export type PromocaoTipo = "PROMOCAO" | "DESTAQUE";
 export type PedidoStatus = "PAGO" | "ATRASADO" | "PENDENTE" | "CANCELADO";
 export type AtendimentoStatus = "ATIVO" | "PENDENTE" | "ENCERRADO";
 export type MensagemTipo = "recebida" | "enviada";
+export type ConversationChannel = "whatsapp" | "telegram";
 
 export interface Produto {
   id: number;
@@ -10,7 +11,6 @@ export interface Produto {
   categoria: string;
   descricao: string;
   preco: string;
-  quantidade: number;
   disponivel: boolean;
   imagem: string;
 }
@@ -89,9 +89,14 @@ export interface Atendimento {
   id: number;
   cliente: string;
   telefone: string;
+  contactId?: string;
   status: AtendimentoStatus;
   ultima_mensagem: string;
   horario: string;
+  channel?: ConversationChannel;
+  leadId?: number;
+  leadStatus?: LeadStatus;
+  leadStatusSuggestion?: Extract<LeadStatus, "CONVERTIDO" | "PERDIDO">;
 }
 
 export interface Mensagem {
@@ -100,6 +105,9 @@ export interface Mensagem {
   conteudo: string;
   horario: string;
   remetente?: string;
+  conversationId?: number;
+  channel?: ConversationChannel;
+  type?: string;
 }
 
 export interface DashboardTopProduto {
@@ -143,4 +151,3 @@ export interface Metricas {
   topProdutos: MetricaTopProduto[];
   novosClientes: number;
 }
-

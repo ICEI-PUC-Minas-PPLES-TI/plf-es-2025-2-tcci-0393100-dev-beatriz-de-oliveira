@@ -51,13 +51,6 @@ export class GreetingHandler implements IntentHandler {
         stage: "MENU_PRINCIPAL",
         awaitingHumanHandoffDecision: false,
         lastShownProducts: [],
-        selectedProductName: undefined,
-        selectedProductCategory: undefined,
-        productBrowseOffset: 0,
-        productBrowseSearchTerm: undefined,
-        productBrowsePromotionOnly: false,
-        productBrowseMinPrice: undefined,
-        productBrowseMaxPrice: undefined,
       },
     };
   }

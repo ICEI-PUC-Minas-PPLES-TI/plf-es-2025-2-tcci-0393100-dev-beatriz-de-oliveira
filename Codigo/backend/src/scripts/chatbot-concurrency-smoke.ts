@@ -23,12 +23,6 @@ class FakeProductsService {
   }
 }
 
-class FakePromotionsService {
-  async listActive() {
-    return [];
-  }
-}
-
 class FakeLeadsService {
   private readonly byPhone = new Map<string, Lead>();
   private sequence = 1;
@@ -88,7 +82,6 @@ async function main() {
       categoria: "Climatizacao",
       descricao: "Ventilador potente",
       preco: "299.90",
-      quantidade: 10,
       disponivel: true,
       imagem: "https://example.com/ventilador.png",
     },
@@ -98,19 +91,17 @@ async function main() {
       categoria: "Eletrodomesticos",
       descricao: "Liquidificador resistente",
       preco: "199.90",
-      quantidade: 8,
       disponivel: true,
       imagem: "https://example.com/liquidificador.png",
     },
   ]);
-  const promotionsService = new FakePromotionsService();
   const leadsService = new FakeLeadsService();
   const core = new ChatbotCoreService({
     productsService: productsService as any,
-    promotionsService: promotionsService as any,
     leadsService: leadsService as any,
   });
 
+  // 1) Duplicidade: mesma mensagem duas vezes
   const duplicatePayload = webhookPayload({ from: "5511000000001", messageId: "wamid-dup-1", text: "oi" });
   const [dupA, dupB] = await Promise.all([core.processEvent(duplicatePayload), core.processEvent(duplicatePayload)]);
   console.log("duplicate_test", {
@@ -119,6 +110,7 @@ async function main() {
     secondIgnoredDuplicates: dupB.ignoredDuplicates,
   });
 
+  // 2) Mesmo telefone em sequencia rapida: manter ordem logica
   const samePhoneA = webhookPayload({ from: "5511000000002", messageId: "wamid-same-1", text: "quero ver produtos" });
   const samePhoneB = webhookPayload({ from: "5511000000002", messageId: "wamid-same-2", text: "quero o primeiro" });
   const [sameA, sameB] = await Promise.all([core.processEvent(samePhoneA), core.processEvent(samePhoneB)]);
@@ -127,6 +119,7 @@ async function main() {
     secondIntent: sameB.responses[0]?.intent,
   });
 
+  // 3) Telefones diferentes: podem processar em paralelo
   const parallelA = webhookPayload({ from: "5511000000003", messageId: "wamid-par-1", text: "menu" });
   const parallelB = webhookPayload({ from: "5511000000004", messageId: "wamid-par-2", text: "menu" });
   const [parA, parB] = await Promise.all([core.processEvent(parallelA), core.processEvent(parallelB)]);
@@ -135,6 +128,7 @@ async function main() {
     bIntent: parB.responses[0]?.intent,
   });
 
+  // 4) Erro nao bloqueia fila do telefone
   productsService.failNextProductsRequest();
   const errorA = webhookPayload({ from: "5511000000005", messageId: "wamid-err-1", text: "quero ver produtos" });
   const afterError = webhookPayload({ from: "5511000000005", messageId: "wamid-err-2", text: "menu" });

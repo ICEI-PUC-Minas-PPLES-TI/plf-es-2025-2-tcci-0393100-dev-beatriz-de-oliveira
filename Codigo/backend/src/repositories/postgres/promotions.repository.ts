@@ -19,49 +19,6 @@ type PromotionRow = {
   produto_imagem: string | null;
 };
 
-function toDateOnly(value: string | Date | null | undefined): string | null {
-  if (!value) {
-    return null;
-  }
-
-  if (value instanceof Date) {
-    return value.toISOString().slice(0, 10);
-  }
-
-  return value.slice(0, 10);
-}
-
-function getTodayInSaoPaulo(): string {
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Sao_Paulo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-
-  return formatter.format(new Date());
-}
-
-function isPromotionCurrentlyActive(row: PromotionRow): boolean {
-  if (!row.ativo) {
-    return false;
-  }
-
-  const today = getTodayInSaoPaulo();
-  const startDate = toDateOnly(row.inicio_em);
-  const endDate = toDateOnly(row.fim_em);
-
-  if (startDate && startDate > today) {
-    return false;
-  }
-
-  if (endDate && endDate < today) {
-    return false;
-  }
-
-  return true;
-}
-
 export class PostgresPromotionsRepository implements PromotionsRepository {
   private schemaReadyPromise?: Promise<void>;
   private productImageColumnPromise?: Promise<boolean>;
@@ -180,7 +137,7 @@ export class PostgresPromotionsRepository implements PromotionsRepository {
       produto_id: Number(row.produto_id ?? 0),
       produto: row.produto_nome ?? row.nome,
       tipo: row.tipo ?? "PROMOCAO",
-      ativa: isPromotionCurrentlyActive(row),
+      ativa: Boolean(row.ativo),
       inicio_em: this.formatDate(row.inicio_em),
       fim_em: this.formatDate(row.fim_em),
       imagem: row.imagem ?? row.produto_imagem ?? "",

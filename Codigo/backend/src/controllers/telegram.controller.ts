@@ -41,13 +41,37 @@ export async function receiveTelegramWebhookController(request: FastifyRequest, 
     });
   }
 
+  const updateKind = body.edited_message
+    ? "edited_message"
+    : body.callback_query
+      ? "callback_query"
+      : body.message?.photo?.length
+        ? "photo"
+        : body.message?.sticker
+          ? "sticker"
+          : body.message
+            ? "message"
+            : "unsupported_update";
+
+  console.info("[TelegramWebhook] received", {
+    updateId: body.update_id,
+    updateKind,
+    chatId: body.message?.chat?.id ? String(body.message.chat.id) : undefined,
+    messageId: body.message?.message_id ? String(body.message.message_id) : undefined,
+    hasText: Boolean(body.message?.text?.trim()),
+  });
+
   let result;
   try {
     result = await container.telegramService.processWebhookEvent(body);
   } catch (error) {
-    console.warn("[Telegram] Erro no webhook", {
+    console.error("[Telegram] Erro no webhook", {
       ip: request.ip,
       error: error instanceof Error ? error.message : "unknown_error",
+      stack: error instanceof Error ? error.stack : undefined,
+      code: typeof error === "object" && error !== null && "code" in error ? String((error as { code?: unknown }).code) : undefined,
+      detail: typeof error === "object" && error !== null && "detail" in error ? String((error as { detail?: unknown }).detail) : undefined,
+      constraint: typeof error === "object" && error !== null && "constraint" in error ? String((error as { constraint?: unknown }).constraint) : undefined,
     });
     return reply.code(200).send({
       received: true,
@@ -55,6 +79,16 @@ export async function receiveTelegramWebhookController(request: FastifyRequest, 
       extractedMessages: 0,
     });
   }
+
+  console.info("[TelegramWebhook] processed", {
+    updateId: body.update_id,
+    consumed: result.consumed,
+    extractedMessages: result.extractedMessages,
+    reason: result.reason,
+    processed: result.messageResults?.filter((item) => item.status === "processed").length ?? 0,
+    duplicates: result.ignoredDuplicates ?? 0,
+    failed: result.failedMessages ?? 0,
+  });
 
   return reply.code(200).send({
     received: true,

@@ -8,4 +8,3 @@ export async function loginController(request: FastifyRequest, reply: FastifyRep
   const result = await container.authService.login(body.email, body.senha);
   return reply.send(result);
 }
-

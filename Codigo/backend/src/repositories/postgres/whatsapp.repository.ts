@@ -33,6 +33,7 @@ type ConversationIdentityRow = {
   numeric_id: number;
   telefone: string | null;
   cliente: string | null;
+  lead_id?: string | null;
 };
 
 type ConversationAutomationRow = {
@@ -203,7 +204,10 @@ export class PostgresWhatsAppRepository implements WhatsAppRepository {
       });
 
       await client.query("COMMIT");
-      return this.mapMessageRow(inserted.rows[0]!);
+      return {
+        ...this.mapMessageRow(inserted.rows[0]!),
+        conversationId: conversation.numericId,
+      };
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;
@@ -324,59 +328,90 @@ export class PostgresWhatsAppRepository implements WhatsAppRepository {
   }
 
   async updateConversationStatus(atendimentoId: number, status: AtendimentoStatus): Promise<Atendimento | null> {
-    const updated = await pool.query(
-      `
-        UPDATE atendimentos
-        SET status = $2::varchar,
-            encaminhado_humano = CASE
-              WHEN $2::varchar IN ('ATIVO', 'ENCERRADO') THEN FALSE
-              WHEN $2::varchar = 'PENDENTE' THEN TRUE
-              ELSE encaminhado_humano
-            END,
-            estado_conversa = CASE
-              WHEN $2::varchar IN ('ATIVO', 'ENCERRADO') THEN 'IDLE'
-              WHEN $2::varchar = 'PENDENTE' THEN 'ENCAMINHADO_HUMANO'
-              ELSE estado_conversa
-            END,
-            ultima_interacao_em = NOW()
-        WHERE canal = 'WHATSAPP'
-          AND abs(hashtext(atendimento_id::text)) = $1
-      `,
-      [atendimentoId, status],
-    );
+    const client = await pool.connect();
 
-    if ((updated.rowCount ?? 0) === 0) {
-      return null;
-    }
+    try {
+      await client.query("BEGIN");
 
-    const result = await pool.query<ConversationRow>(
-      `
-        SELECT
-          a.atendimento_id,
-          abs(hashtext(a.atendimento_id::text)) AS numeric_id,
-          c.telefone,
-          c.nome AS cliente,
-          a.status,
-          lm.conteudo AS ultima_mensagem,
-          COALESCE(lm.data_envio, a.ultima_interacao_em, a.iniciado_em) AS horario
-        FROM atendimentos a
-        LEFT JOIN clientes c ON c.cliente_id = a.cliente_id
-        LEFT JOIN LATERAL (
-          SELECT m.conteudo, m.data_envio
-          FROM mensagens m
-          WHERE m.atendimento_id = a.atendimento_id
-          ORDER BY m.xmin::text::bigint DESC, m.data_envio DESC NULLS LAST, m.mensagem_id DESC
+      const identity = await client.query<ConversationIdentityRow>(
+        `
+          SELECT
+            a.atendimento_id,
+            abs(hashtext(a.atendimento_id::text)) AS numeric_id,
+            c.telefone,
+            c.nome AS cliente,
+            a.lead_id
+          FROM atendimentos a
+          LEFT JOIN clientes c ON c.cliente_id = a.cliente_id
+          WHERE a.canal = 'WHATSAPP'
+            AND abs(hashtext(a.atendimento_id::text)) = $1
           LIMIT 1
-        ) lm ON TRUE
-        WHERE a.canal = 'WHATSAPP'
-          AND abs(hashtext(a.atendimento_id::text)) = $1
-        LIMIT 1
-      `,
-      [atendimentoId],
-    );
+        `,
+        [atendimentoId],
+      );
 
-    const row = result.rows[0];
-    return row ? this.mapConversationRow(row) : null;
+      const conversation = identity.rows[0];
+      if (!conversation) {
+        await client.query("ROLLBACK");
+        return null;
+      }
+
+      await client.query(
+        `
+          UPDATE atendimentos
+          SET status = $2::varchar,
+              encaminhado_humano = CASE
+                WHEN $2::varchar IN ('ATIVO', 'ENCERRADO') THEN FALSE
+                WHEN $2::varchar = 'PENDENTE' THEN TRUE
+                ELSE encaminhado_humano
+              END,
+              estado_conversa = CASE
+                WHEN $2::varchar IN ('ATIVO', 'ENCERRADO') THEN 'IDLE'
+                WHEN $2::varchar = 'PENDENTE' THEN 'ENCAMINHADO_HUMANO'
+                ELSE estado_conversa
+              END,
+              ultima_interacao_em = NOW()
+          WHERE canal = 'WHATSAPP'
+            AND abs(hashtext(atendimento_id::text)) = $1
+        `,
+        [atendimentoId, status],
+      );
+
+      const result = await client.query<ConversationRow>(
+        `
+          SELECT
+            a.atendimento_id,
+            abs(hashtext(a.atendimento_id::text)) AS numeric_id,
+            c.telefone,
+            c.nome AS cliente,
+            a.status,
+            lm.conteudo AS ultima_mensagem,
+            COALESCE(lm.data_envio, a.ultima_interacao_em, a.iniciado_em) AS horario
+          FROM atendimentos a
+          LEFT JOIN clientes c ON c.cliente_id = a.cliente_id
+          LEFT JOIN LATERAL (
+            SELECT m.conteudo, m.data_envio
+            FROM mensagens m
+            WHERE m.atendimento_id = a.atendimento_id
+            ORDER BY m.xmin::text::bigint DESC, m.data_envio DESC NULLS LAST, m.mensagem_id DESC
+            LIMIT 1
+          ) lm ON TRUE
+          WHERE a.canal = 'WHATSAPP'
+            AND abs(hashtext(a.atendimento_id::text)) = $1
+          LIMIT 1
+        `,
+        [atendimentoId],
+      );
+
+      await client.query("COMMIT");
+      const row = result.rows[0];
+      return row ? this.mapConversationRow(row) : null;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async updateCustomerNameByPhone(phone: string, name: string): Promise<void> {

@@ -1,9 +1,11 @@
 import { env } from "../config/env.js";
 import type { ChatbotCoreService } from "../modules/chatbot/chatbot-core.service.js";
+import type { TelegramRepository } from "../repositories/telegram.repository.js";
 import type { ChatbotProcessResult, ChatbotResponse } from "../modules/chatbot/types.js";
 import type { Produto } from "../types/domain.js";
 import { AppError } from "../utils/app-error.js";
 import type { ProductsService } from "./products.service.js";
+import type { LeadStatusService } from "./lead-status.service.js";
 import { buildTelegramPhotoCaption, buildTelegramPreparedResponse, buildTelegramTextCard } from "./telegram/telegram-product-response.js";
 import { parseTelegramUpdate, type TelegramWebhookPayload } from "./telegram/telegram-update-parser.js";
 
@@ -11,13 +13,41 @@ type TelegramApiErrorPayload = {
   description?: string;
 };
 
+function formatErrorDetails(error: unknown) {
+  if (error instanceof Error) {
+    return {
+      message: error.message,
+      stack: error.stack,
+      code: "code" in error ? String((error as { code?: unknown }).code) : undefined,
+      detail: "detail" in error ? String((error as { detail?: unknown }).detail) : undefined,
+      constraint: "constraint" in error ? String((error as { constraint?: unknown }).constraint) : undefined,
+    };
+  }
+
+  return {
+    message: String(error),
+    stack: undefined,
+    code: undefined,
+    detail: undefined,
+    constraint: undefined,
+  };
+}
+
 export class TelegramService {
   constructor(
     private readonly chatbotCore: ChatbotCoreService,
     private readonly productsService: ProductsService,
+    private readonly repository: TelegramRepository,
+    private readonly leadStatusService: LeadStatusService,
   ) {}
 
   async processWebhookEvent(payload: TelegramWebhookPayload): Promise<ChatbotProcessResult> {
+    console.info("[TelegramService] process_webhook_event_start", {
+      hasMessage: Boolean(payload.message),
+      hasEditedMessage: Boolean(payload.edited_message),
+      hasCallbackQuery: Boolean(payload.callback_query),
+    });
+
     const parsed = parseTelegramUpdate(payload);
 
     if (parsed.kind === "invalid") {
@@ -47,6 +77,54 @@ export class TelegramService {
     }
 
     const message = parsed.message;
+    console.info("[TelegramService] normalized_payload", {
+      chatId: message.from,
+      dedupKey: message.messageId,
+      hasStableMessageId: message.hasStableMessageId,
+      timestamp: message.timestamp,
+      profileName: message.profileName,
+      preview: message.text.slice(0, 80),
+    });
+
+    console.info("[TelegramService] inbound_message", {
+      chatId: message.from,
+      dedupKey: message.messageId,
+      timestamp: message.timestamp,
+      preview: message.text.slice(0, 80),
+    });
+
+    let savedConversation;
+    try {
+      console.info("[TelegramService] inbound_persist_start", {
+        chatId: message.from,
+        dedupKey: message.messageId,
+        customerName: message.profileName,
+      });
+      savedConversation = await this.repository.saveIncomingMessage({
+        chatId: message.from,
+        customerName: message.profileName,
+        text: message.text,
+        messageId: message.messageId,
+        timestamp: message.timestamp,
+      });
+    } catch (error) {
+      console.error("[TelegramService] inbound_persist_failed", {
+        chatId: message.from,
+        dedupKey: message.messageId,
+        ...formatErrorDetails(error),
+      });
+      throw error;
+    }
+
+    console.info("[TelegramService] inbound_persisted", {
+      chatId: message.from,
+      atendimentoId: savedConversation.atendimentoId,
+      contactId: savedConversation.contactId,
+      channel: "TELEGRAM",
+    });
+
+    await this.leadStatusService.updateLeadStatusFromConversation(savedConversation.atendimentoId);
+
     console.info("[Telegram] Webhook recebido", {
       chatId: message.from,
       messageId: message.messageId,
@@ -56,10 +134,10 @@ export class TelegramService {
     try {
       result = await this.chatbotCore.processIncomingMessages([message], payload as Record<string, unknown>);
     } catch (error) {
-      console.warn("[Telegram] Erro ao processar mensagem", {
+      console.error("[Telegram] Erro ao processar mensagem", {
         chatId: message.from,
         messageId: message.messageId,
-        error: error instanceof Error ? error.message : "unknown_error",
+        ...formatErrorDetails(error),
       });
       return {
         consumed: false,
@@ -70,9 +148,22 @@ export class TelegramService {
       };
     }
 
+    for (const item of result.messageResults ?? []) {
+      console.info("[TelegramService] chatbot_result", {
+        chatId: item.phone,
+        dedupKey: item.messageId,
+        status: item.status,
+        intent: item.response?.intent,
+      });
+    }
+
     for (const messageResult of result.messageResults ?? []) {
       if (messageResult.status !== "processed" || !messageResult.response) {
         continue;
+      }
+
+      if (messageResult.response.capturedCustomerName) {
+        await this.repository.updateCustomerNameByChatId(messageResult.phone, messageResult.response.capturedCustomerName);
       }
 
       try {
@@ -83,10 +174,10 @@ export class TelegramService {
           intent: messageResult.response.intent,
         });
       } catch (error) {
-        console.warn("[Telegram] Erro ao enviar mensagem", {
+        console.error("[Telegram] Erro ao enviar mensagem", {
           chatId: messageResult.phone,
           messageId: messageResult.messageId,
-          error: error instanceof Error ? error.message : "unknown_error",
+          ...formatErrorDetails(error),
         });
       }
     }
@@ -163,41 +254,115 @@ export class TelegramService {
   }
 
   private async sendTextMessage(chatId: string, text: string): Promise<void> {
-    const token = this.getBotToken();
-    const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text,
-      }),
-    });
+    try {
+      const token = this.getBotToken();
+      const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text,
+        }),
+      });
 
-    if (!response.ok) {
-      const payload = (await response.json().catch(() => null)) as TelegramApiErrorPayload | null;
-      throw new AppError(payload?.description ?? `Telegram API returned ${response.status}`, 502, "TELEGRAM_SEND_FAILED");
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as TelegramApiErrorPayload | null;
+        throw new AppError(payload?.description ?? `Telegram API returned ${response.status}`, 502, "TELEGRAM_SEND_FAILED");
+      }
+
+      const savedMessage = await this.repository.saveOutgoingMessage({
+        chatId,
+        text,
+        type: "text",
+        statusEntrega: "ENVIADA",
+      });
+      console.info("[TelegramService] outbound_persisted", {
+        chatId,
+        conversationId: savedMessage.conversationId,
+        type: "text",
+        deliveryStatus: "ENVIADA",
+        preview: text.slice(0, 80),
+      });
+      if (savedMessage.conversationId) {
+        await this.leadStatusService.updateLeadStatusFromConversation(savedMessage.conversationId);
+      }
+    } catch (error) {
+      const failedMessage = await this.repository.saveOutgoingMessage({
+        chatId,
+        text,
+        type: "text",
+        statusEntrega: "FALHA",
+      });
+      console.error("[TelegramService] outbound_persist_failed_send", {
+        chatId,
+        conversationId: failedMessage.conversationId,
+        type: "text",
+        deliveryStatus: "FALHA",
+        ...formatErrorDetails(error),
+      });
+      if (failedMessage.conversationId) {
+        await this.leadStatusService.updateLeadStatusFromConversation(failedMessage.conversationId);
+      }
+      throw error;
     }
   }
 
   private async sendPhotoMessage(chatId: string, photoUrl: string, caption: string): Promise<void> {
-    const token = this.getBotToken();
-    const response = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        chat_id: chatId,
-        photo: photoUrl,
-        caption,
-      }),
-    });
+    try {
+      const token = this.getBotToken();
+      const response = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          chat_id: chatId,
+          photo: photoUrl,
+          caption,
+        }),
+      });
 
-    if (!response.ok) {
-      const payload = (await response.json().catch(() => null)) as TelegramApiErrorPayload | null;
-      throw new AppError(payload?.description ?? `Telegram API returned ${response.status}`, 502, "TELEGRAM_SEND_PHOTO_FAILED");
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as TelegramApiErrorPayload | null;
+        throw new AppError(payload?.description ?? `Telegram API returned ${response.status}`, 502, "TELEGRAM_SEND_PHOTO_FAILED");
+      }
+
+      const savedMessage = await this.repository.saveOutgoingMessage({
+        chatId,
+        text: caption,
+        type: "image",
+        statusEntrega: "ENVIADA",
+      });
+      console.info("[TelegramService] outbound_persisted", {
+        chatId,
+        conversationId: savedMessage.conversationId,
+        type: "image",
+        deliveryStatus: "ENVIADA",
+        preview: caption.slice(0, 80),
+      });
+      if (savedMessage.conversationId) {
+        await this.leadStatusService.updateLeadStatusFromConversation(savedMessage.conversationId);
+      }
+    } catch (error) {
+      const failedMessage = await this.repository.saveOutgoingMessage({
+        chatId,
+        text: caption,
+        type: "image",
+        statusEntrega: "FALHA",
+      });
+      console.error("[TelegramService] outbound_persist_failed_send", {
+        chatId,
+        conversationId: failedMessage.conversationId,
+        type: "image",
+        deliveryStatus: "FALHA",
+        ...formatErrorDetails(error),
+      });
+      if (failedMessage.conversationId) {
+        await this.leadStatusService.updateLeadStatusFromConversation(failedMessage.conversationId);
+      }
+      throw error;
     }
   }
 

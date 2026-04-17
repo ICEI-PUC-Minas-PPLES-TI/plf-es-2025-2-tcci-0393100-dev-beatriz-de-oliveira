@@ -40,7 +40,7 @@ const navigation: NavigationItem[] = [
   { name: "Leads", href: "/leads", icon: Users },
   { name: "M\u00e9tricas", href: "/metricas", icon: BarChart3, ownerOnly: true },
   { name: "Cobran\u00e7as", href: "/cobrancas", icon: CreditCard },
-  { name: "WhatsApp", href: "/whatsapp", icon: MessageSquare },
+  { name: "Conversas", href: "/conversas", icon: MessageSquare },
 ];
 
 export function AppLayout() {

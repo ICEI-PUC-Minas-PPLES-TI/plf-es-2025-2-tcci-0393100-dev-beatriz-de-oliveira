@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
-import { env } from "../config/env.js";
 import { authRoutes } from "../modules/auth/auth.routes.js";
 import { billingRoutes } from "../modules/billing/billing.routes.js";
+import { conversationsRoutes } from "../modules/conversations/conversations.routes.js";
 import { dashboardRoutes } from "../modules/dashboard/dashboard.routes.js";
 import { leadsRoutes } from "../modules/leads/leads.routes.js";
 import { metricsRoutes } from "../modules/metrics/metrics.routes.js";
@@ -41,6 +41,7 @@ export async function registerRoutes(fastify: FastifyInstance) {
     await protectedScope.register(promotionsRoutes, { prefix: "/promotions" });
     await protectedScope.register(leadsRoutes, { prefix: "/leads" });
     await protectedScope.register(billingRoutes, { prefix: "/billing-rules" });
+    await protectedScope.register(conversationsRoutes, { prefix: "/conversations" });
     await protectedScope.register(whatsAppInboxRoutes, { prefix: "/whatsapp" });
 
     await protectedScope.register(async (ownerScope) => {
@@ -50,5 +51,5 @@ export async function registerRoutes(fastify: FastifyInstance) {
   });
 
   await fastify.register(whatsAppWebhookRoutes, { prefix: "/webhooks" });
-  await fastify.register(telegramWebhookRoutes, { prefix: env.TELEGRAM_WEBHOOK_PATH });
+  await fastify.register(telegramWebhookRoutes, { prefix: "/webhooks" });
 }

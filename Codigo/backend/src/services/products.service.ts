@@ -1,11 +1,11 @@
-import type { ProductListOptions, ProductsRepository } from "../repositories/products.repository.js";
+import type { ProductsRepository } from "../repositories/products.repository.js";
 import type { Produto } from "../types/domain.js";
 
 export class ProductsService {
   constructor(private readonly repository: ProductsRepository) {}
 
-  list(options?: ProductListOptions): Promise<Produto[]> {
-    return this.repository.findAll(options);
+  list(): Promise<Produto[]> {
+    return this.repository.findAll();
   }
 
   create(data: Omit<Produto, "id">): Promise<Produto> {

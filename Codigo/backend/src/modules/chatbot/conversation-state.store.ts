@@ -21,8 +21,6 @@ export class ConversationStateStore {
       handoffRequested: false,
       awaitingHumanHandoffDecision: false,
       lastShownProducts: [],
-      productBrowseOffset: 0,
-      productBrowsePromotionOnly: false,
     };
     this.states.set(phoneNumber, initial);
     return initial;
@@ -41,12 +39,6 @@ export class ConversationStateStore {
           | "awaitingHumanHandoffDecision"
           | "lastShownProducts"
           | "selectedProductName"
-          | "selectedProductCategory"
-          | "productBrowseOffset"
-          | "productBrowseSearchTerm"
-          | "productBrowsePromotionOnly"
-          | "productBrowseMinPrice"
-          | "productBrowseMaxPrice"
           | "pendingIntentAfterName"
           | "pendingInterestSummary"
         >
@@ -72,12 +64,6 @@ export class ConversationStateStore {
       handoffRequested: true,
       awaitingHumanHandoffDecision: false,
       lastShownProducts: [],
-      selectedProductCategory: undefined,
-      productBrowseOffset: 0,
-      productBrowseSearchTerm: undefined,
-      productBrowsePromotionOnly: false,
-      productBrowseMinPrice: undefined,
-      productBrowseMaxPrice: undefined,
       pendingIntentAfterName: undefined,
       pendingInterestSummary: undefined,
       lastMessageAt: now,
@@ -95,12 +81,6 @@ export class ConversationStateStore {
       awaitingHumanHandoffDecision: false,
       lastShownProducts: [],
       selectedProductName: undefined,
-      selectedProductCategory: undefined,
-      productBrowseOffset: 0,
-      productBrowseSearchTerm: undefined,
-      productBrowsePromotionOnly: false,
-      productBrowseMinPrice: undefined,
-      productBrowseMaxPrice: undefined,
       pendingIntentAfterName: undefined,
       pendingInterestSummary: undefined,
       lastMessageAt: now,

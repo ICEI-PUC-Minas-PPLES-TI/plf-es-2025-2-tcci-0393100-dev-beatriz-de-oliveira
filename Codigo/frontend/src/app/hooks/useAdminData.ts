@@ -5,6 +5,7 @@ import { useAsyncData } from "./useAsyncData";
 import type {
   Atendimento,
   BillingRule,
+  ConversationChannel,
   DashboardSummary,
   Lead,
   Mensagem,
@@ -53,6 +54,22 @@ export function useMensagensData(atendimentoId: number | null) {
   }, [atendimentoId]);
 
   return useAsyncData<Mensagem[]>(loader, [], { enabled: atendimentoId !== null });
+}
+
+export function useConversationsData(channel: ConversationChannel | "todos") {
+  const loader = useCallback(() => adminDataService.listConversations(channel), [channel]);
+  return useAsyncData<Atendimento[]>(loader, []);
+}
+
+export function useConversationMessagesData(conversationId: number | null) {
+  const loader = useCallback(() => {
+    if (conversationId === null) {
+      return Promise.resolve([] as Mensagem[]);
+    }
+    return adminDataService.listConversationMessages(conversationId);
+  }, [conversationId]);
+
+  return useAsyncData<Mensagem[]>(loader, [], { enabled: conversationId !== null });
 }
 
 export function useMetricasData(periodo?: DateRange, enabled = true) {

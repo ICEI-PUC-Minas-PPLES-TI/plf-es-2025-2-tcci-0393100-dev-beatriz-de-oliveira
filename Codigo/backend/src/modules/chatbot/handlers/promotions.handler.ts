@@ -15,7 +15,7 @@ export class PromotionsHandler implements IntentHandler {
   constructor(private readonly promotionsService: PromotionsService) {}
 
   async handle(_context: ChatbotContext): Promise<ChatbotResponse> {
-    const promotions = (await this.promotionsService.listActive()).filter((promotion) => promotion.tipo === "PROMOCAO");
+    const promotions = await this.promotionsService.listActive();
 
     if (promotions.length === 0) {
       return {

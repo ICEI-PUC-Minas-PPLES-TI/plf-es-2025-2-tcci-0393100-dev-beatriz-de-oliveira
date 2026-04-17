@@ -1,8 +1,9 @@
-﻿export type LeadStatus = "NOVO" | "ENCAMINHADO_HUMANO" | "EM_CONTATO" | "CONVERTIDO" | "PERDIDO";
+export type LeadStatus = "NOVO" | "ENCAMINHADO_HUMANO" | "EM_CONTATO" | "CONVERTIDO" | "PERDIDO";
 export type PromocaoTipo = "PROMOCAO" | "DESTAQUE";
 export type PedidoStatus = "PAGO" | "ATRASADO" | "PENDENTE" | "CANCELADO";
 export type AtendimentoStatus = "ATIVO" | "PENDENTE" | "ENCERRADO";
 export type MensagemTipo = "recebida" | "enviada";
+export type ConversationChannel = "whatsapp" | "telegram";
 export type DisponibilidadeStatus = "disponivel" | "indisponivel";
 
 export interface Produto {
@@ -61,9 +62,14 @@ export interface Atendimento {
   id: number;
   cliente: string;
   telefone: string;
+  contactId?: string;
   status: AtendimentoStatus;
   ultima_mensagem: string;
   horario: string;
+  channel?: ConversationChannel;
+  leadId?: number;
+  leadStatus?: LeadStatus;
+  leadStatusSuggestion?: Extract<LeadStatus, "CONVERTIDO" | "PERDIDO">;
 }
 
 export interface Mensagem {
@@ -72,6 +78,9 @@ export interface Mensagem {
   conteudo: string;
   horario: string;
   remetente?: string;
+  conversationId?: number;
+  channel?: ConversationChannel;
+  type?: string;
 }
 
 export interface MetricaVendaDia {
@@ -115,7 +124,3 @@ export interface DashboardSummary {
   topProdutos: DashboardTopProduto[];
   atendimentosRecentes: DashboardAtendimentoRecente[];
 }
-
-
-
-

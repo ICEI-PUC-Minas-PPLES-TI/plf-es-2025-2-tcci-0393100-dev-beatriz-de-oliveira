@@ -44,12 +44,6 @@ export class LeadHandler implements IntentHandler {
         stage: "CONSULTANDO_PRODUTOS",
         awaitingHumanHandoffDecision: true,
         selectedProductName: context.selectedProductName,
-        selectedProductCategory: context.state.selectedProductCategory,
-        productBrowseOffset: context.state.productBrowseOffset,
-        productBrowseSearchTerm: context.state.productBrowseSearchTerm,
-        productBrowsePromotionOnly: context.state.productBrowsePromotionOnly,
-        productBrowseMinPrice: context.state.productBrowseMinPrice,
-        productBrowseMaxPrice: context.state.productBrowseMaxPrice,
       },
     };
   }

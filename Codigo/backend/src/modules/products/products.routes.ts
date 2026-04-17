@@ -14,31 +14,21 @@ const productSchema = {
     categoria: { type: "string" },
     descricao: { type: "string" },
     preco: { type: "string" },
-    quantidade: { type: "number" },
     disponivel: { type: "boolean" },
     imagem: { type: "string" },
-  },
-};
-
-const productListQuerySchema = {
-  type: "object",
-  properties: {
-    search: { type: "string" },
-    limit: { type: "number" },
   },
 };
 
 const productBodySchema = {
   type: "object",
-  required: ["nome", "categoria", "descricao", "preco", "quantidade", "disponivel", "imagem"],
+  required: ["nome", "categoria", "descricao", "preco", "disponivel", "imagem"],
   properties: {
     nome: { type: "string" },
     categoria: { type: "string" },
     descricao: { type: "string" },
     preco: { type: "string" },
-    quantidade: { type: "number" },
     disponivel: { type: "boolean" },
-    imagem: { type: "string" },
+    imagem: { type: "string", format: "uri" },
   },
 };
 
@@ -50,7 +40,6 @@ export async function productsRoutes(fastify: FastifyInstance) {
         tags: ["Products"],
         summary: "Lista produtos",
         security: [{ bearerAuth: [] }],
-        querystring: productListQuerySchema,
         response: {
           200: {
             type: "object",

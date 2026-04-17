@@ -8,6 +8,8 @@ export const API_ENDPOINTS = {
   billingRules: "/billing-rules",
   billingOrders: "/billing-rules/orders",
   billingRuns: "/billing-rules/runs",
+  conversations: "/conversations",
+  conversationMessages: (conversationId: number) => `/conversations/${conversationId}/messages`,
   whatsappConversations: "/whatsapp/conversations",
   whatsappMessages: (atendimentoId: number) => `/whatsapp/messages/${atendimentoId}`,
   whatsappSend: "/whatsapp/send",

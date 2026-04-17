@@ -54,7 +54,6 @@ const AFFIRMATIVE_PATTERNS = [
   /\bprimeiro\b/,
 ];
 const NEGATIVE_PATTERNS = [/\bnao\b/, /\bagora nao\b/, /\bdepois\b/, /\bnao precisa\b/, /\bdispenso\b/];
-const SHOW_MORE_PATTERNS = [/\bmais\b/, /\bver mais\b/, /\bmostrar mais\b/, /\bmais itens\b/, /\bmais produtos\b/];
 
 export function isAffirmativeMessage(normalizedText: string): boolean {
   return AFFIRMATIVE_PATTERNS.some((pattern) => pattern.test(normalizedText));
@@ -62,10 +61,6 @@ export function isAffirmativeMessage(normalizedText: string): boolean {
 
 export function isNegativeMessage(normalizedText: string): boolean {
   return NEGATIVE_PATTERNS.some((pattern) => pattern.test(normalizedText));
-}
-
-function isShowMoreMessage(normalizedText: string): boolean {
-  return SHOW_MORE_PATTERNS.some((pattern) => pattern.test(normalizedText));
 }
 
 export function parseProductChoice(normalizedText: string, totalProducts: number): number | null {
@@ -99,26 +94,10 @@ export function detectIntent(normalizedText: string, state: ChatbotConversationS
     if (isNegativeMessage(normalizedText)) return "menu";
   }
 
-  if (state.stage === "AGUARDANDO_CATEGORIA_PRODUTO") {
-    if (normalizedText === "menu") return "menu";
-    if (hasAnyKeyword(normalizedText, HUMAN_HANDOFF_KEYWORDS)) return "human_handoff";
-    if (hasAnyKeyword(normalizedText, PROMOTIONS_KEYWORDS)) return "promotions";
-    return "products";
-  }
-
   if (state.stage === "AGUARDANDO_ESCOLHA_PRODUTO") {
     if (parseProductChoice(normalizedText, state.lastShownProducts.length) !== null) return "lead_interest";
     if (isAffirmativeMessage(normalizedText)) return "lead_interest";
     if (isNegativeMessage(normalizedText)) return "menu";
-    if (isShowMoreMessage(normalizedText)) return "products";
-    return "products";
-  }
-
-  if (state.stage === "CONSULTANDO_PRODUTOS" && state.selectedProductCategory) {
-    if (normalizedText === "menu") return "menu";
-    if (hasAnyKeyword(normalizedText, HUMAN_HANDOFF_KEYWORDS)) return "human_handoff";
-    if (hasAnyKeyword(normalizedText, PROMOTIONS_KEYWORDS)) return "promotions";
-    return "products";
   }
 
   if (state.stage === "MENU_PRINCIPAL") {

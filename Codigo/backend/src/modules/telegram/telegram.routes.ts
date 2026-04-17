@@ -5,7 +5,7 @@ export async function telegramWebhookRoutes(fastify: FastifyInstance) {
   // Register this path in Telegram with:
   // https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://SEU_BACKEND${path}
   fastify.post(
-    "/",
+    "/telegram",
     {
       schema: {
         tags: ["Telegram Webhook"],

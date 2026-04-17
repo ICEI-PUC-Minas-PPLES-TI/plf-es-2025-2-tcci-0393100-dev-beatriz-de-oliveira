@@ -92,7 +92,7 @@ export function Leads() {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-muted-foreground" />
           <Input
-            placeholder="Buscar por nome, telefone ou email..."
+            placeholder="Buscar por nome ou telefone..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
@@ -133,9 +133,9 @@ export function Leads() {
           <p className="text-sm font-medium text-green-600">Convertidos</p>
           <p className="text-2xl font-bold text-green-700">{leadsNoPeriodo.filter((l) => getLeadStatus(l.id, l.status) === "CONVERTIDO").length}</p>
         </div>
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-          <p className="text-sm font-medium text-red-600">Perdidos</p>
-          <p className="text-2xl font-bold text-red-700">{leadsNoPeriodo.filter((l) => getLeadStatus(l.id, l.status) === "PERDIDO").length}</p>
+        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+          <p className="text-sm font-medium text-gray-600">Perdidos</p>
+          <p className="text-2xl font-bold text-gray-700">{leadsNoPeriodo.filter((l) => getLeadStatus(l.id, l.status) === "PERDIDO").length}</p>
         </div>
       </div>
 
@@ -151,7 +151,6 @@ export function Leads() {
                 <TableRow className="bg-gray-50">
                   <TableHead>Nome</TableHead>
                   <TableHead>Telefone</TableHead>
-                  <TableHead>Email</TableHead>
                   <TableHead>Interesse</TableHead>
                   <TableHead>Data</TableHead>
                   <TableHead>Status</TableHead>
@@ -163,7 +162,6 @@ export function Leads() {
                   <TableRow key={lead.id} className="hover:bg-gray-50">
                     <TableCell className="font-medium">{lead.nome}</TableCell>
                     <TableCell>{lead.telefone}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{lead.email}</TableCell>
                     <TableCell>
                       <span className="rounded bg-gray-100 px-2 py-1 text-sm">{lead.interesse}</span>
                     </TableCell>

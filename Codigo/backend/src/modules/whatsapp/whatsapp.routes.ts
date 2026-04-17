@@ -1,12 +1,8 @@
 ﻿import type { FastifyInstance } from "fastify";
 import {
-  getWhatsAppConnectionStatusController,
   listWhatsAppConversationsController,
   listWhatsAppMessagesController,
-  logoutWhatsAppController,
-  receiveNormalizedWhatsAppInboundController,
   receiveWhatsAppWebhookController,
-  reconnectWhatsAppController,
   sendWhatsAppMessageController,
   updateWhatsAppConversationStatusController,
   verifyWhatsAppWebhookController,
@@ -77,102 +73,9 @@ export async function whatsAppWebhookRoutes(fastify: FastifyInstance) {
     },
     receiveWhatsAppWebhookController,
   );
-
-  fastify.post(
-    "/whatsapp/normalized",
-    {
-      schema: {
-        tags: ["WhatsApp Webhook"],
-        summary: "Recebe inbound normalizado para bridge de WhatsApp Web API",
-        body: {
-          type: "object",
-          required: ["messages"],
-          properties: {
-            messages: {
-              type: "array",
-              items: {
-                type: "object",
-                required: ["from", "text"],
-                properties: {
-                  from: { type: "string" },
-                  text: { type: "string" },
-                  messageId: { type: "string" },
-                  timestamp: { type: "string" },
-                  profileName: { type: "string" },
-                },
-              },
-            },
-          },
-        },
-        response: {
-          200: {
-            type: "object",
-            properties: {
-              received: { type: "boolean" },
-              consumed: { type: "boolean" },
-              extractedMessages: { type: "number" },
-            },
-          },
-        },
-      },
-    },
-    receiveNormalizedWhatsAppInboundController,
-  );
 }
 
 export async function whatsAppInboxRoutes(fastify: FastifyInstance) {
-  fastify.get(
-    "/connection/status",
-    {
-      schema: {
-        tags: ["WhatsApp Inbox"],
-        summary: "Consulta status do provider de WhatsApp",
-        security: [{ bearerAuth: [] }],
-        response: {
-          200: {
-            type: "object",
-            properties: {
-              data: {
-                type: "object",
-                properties: {
-                  provider: { type: "string" },
-                  status: { type: "string" },
-                  connected: { type: "boolean" },
-                  qr: { type: ["string", "null"] },
-                },
-              },
-            },
-          },
-        },
-      },
-    },
-    getWhatsAppConnectionStatusController,
-  );
-
-  fastify.post(
-    "/connection/reconnect",
-    {
-      schema: {
-        tags: ["WhatsApp Inbox"],
-        summary: "Solicita reconexao do provider de WhatsApp",
-        security: [{ bearerAuth: [] }],
-      },
-    },
-    reconnectWhatsAppController,
-  );
-
-  fastify.post(
-    "/connection/logout",
-    {
-      schema: {
-        tags: ["WhatsApp Inbox"],
-        summary: "Desconecta a sessao do provider de WhatsApp",
-        security: [{ bearerAuth: [] }],
-      },
-    },
-    logoutWhatsAppController,
-  );
-
   fastify.get(
     "/conversations",
     {

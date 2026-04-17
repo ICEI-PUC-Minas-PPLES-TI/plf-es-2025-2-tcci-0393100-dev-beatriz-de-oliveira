@@ -24,4 +24,3 @@ export async function updateLeadStatusController(request: FastifyRequest, reply:
   const data = await container.leadsService.updateStatus(params.id, body.status);
   return reply.send({ data });
 }
-
