@@ -52,6 +52,7 @@ export const seedMetricas: Metricas = {
     { produto: "Sofá Retrátil Premium", vendas: 24, receita: "R$ 59.976,00" },
     { produto: "Geladeira Frost Free 450L", vendas: 18, receita: "R$ 59.382,00" },
   ],
+  novosClientes: 0,
 };
 
 export const seedBillingRule: BillingRule = {

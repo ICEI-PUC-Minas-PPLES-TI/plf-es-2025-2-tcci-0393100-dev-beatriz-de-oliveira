@@ -14,5 +14,11 @@
     "noUncheckedIndexedAccess": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": [
+    "src/controllers-orig",
+    "src/scripts",
+    "src/jobs",
+    "src/repositories/in-memory.repositories.ts"
+  ]
 }

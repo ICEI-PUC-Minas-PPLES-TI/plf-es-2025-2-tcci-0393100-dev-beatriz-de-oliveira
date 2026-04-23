@@ -1,9 +1,10 @@
 import type { MetricsRepository } from "../repositories/metrics.repository.js";
+import type { MetricsFilters } from "../repositories/metrics.repository.js";
 
 export class MetricsService {
   constructor(private readonly repository: MetricsRepository) {}
 
-  get() {
-    return this.repository.get();
+  get(filters?: MetricsFilters) {
+    return this.repository.get(filters);
   }
 }

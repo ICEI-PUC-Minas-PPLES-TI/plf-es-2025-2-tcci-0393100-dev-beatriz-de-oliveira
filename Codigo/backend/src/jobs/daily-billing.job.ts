@@ -13,7 +13,7 @@ export class DailyBillingJob {
 
     this.timer = setInterval(async () => {
       try {
-        const result = await this.billingService.runDailyRoutine();
+        const result = await this.billingService.runDailyRoutine(new Date());
         console.log("[DailyBillingJob] run completed", {
           processed: result.processados,
           eligible: result.elegiveis,
