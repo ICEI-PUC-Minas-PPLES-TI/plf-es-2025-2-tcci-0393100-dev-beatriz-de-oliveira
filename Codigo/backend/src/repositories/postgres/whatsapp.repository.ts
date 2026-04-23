@@ -33,6 +33,7 @@ type ConversationIdentityRow = {
   numeric_id: number;
   telefone: string | null;
   cliente: string | null;
+  status?: string | null;
   lead_id?: string | null;
 };
 
@@ -370,6 +371,11 @@ export class PostgresWhatsAppRepository implements WhatsAppRepository {
                 WHEN $2::varchar = 'PENDENTE' THEN 'ENCAMINHADO_HUMANO'
                 ELSE estado_conversa
               END,
+              encerrado_em = CASE
+                WHEN $2::varchar = 'ENCERRADO' THEN NOW()
+                WHEN $2::varchar IN ('ATIVO', 'PENDENTE') THEN NULL
+                ELSE encerrado_em
+              END,
               ultima_interacao_em = NOW()
           WHERE canal = 'WHATSAPP'
             AND abs(hashtext(atendimento_id::text)) = $1
@@ -450,7 +456,8 @@ export class PostgresWhatsAppRepository implements WhatsAppRepository {
           a.atendimento_id,
           abs(hashtext(a.atendimento_id::text)) AS numeric_id,
           c.telefone,
-          c.nome AS cliente
+          c.nome AS cliente,
+          a.status
         FROM atendimentos a
         LEFT JOIN clientes c ON c.cliente_id = a.cliente_id
         WHERE a.canal = 'WHATSAPP'
@@ -465,6 +472,12 @@ export class PostgresWhatsAppRepository implements WhatsAppRepository {
 
     if (existing.rows[0]) {
       const row = existing.rows[0]!;
+      const shouldCreateNewCycle = row.status === "ENCERRADO" && options.status === "ATIVO" && !options.handoffRequested;
+
+      if (shouldCreateNewCycle) {
+        return this.createConversation(client, customer.customerId, customer.phone, customer.name, leadId, options);
+      }
+
       await client.query(
         `
           UPDATE atendimentos
@@ -489,6 +502,23 @@ export class PostgresWhatsAppRepository implements WhatsAppRepository {
       };
     }
 
+    return this.createConversation(client, customer.customerId, customer.phone, customer.name, leadId, options);
+  }
+
+  private async createConversation(
+    client: PoolClient,
+    customerId: string,
+    phone: string,
+    customerName: string,
+    leadId: string | null,
+    options: {
+      customerName?: string;
+      status: AtendimentoStatus;
+      handoffRequested?: boolean;
+      intent?: string;
+      stage?: string;
+    },
+  ): Promise<{ atendimentoUuid: string; numericId: number; phone: string; customerName: string }> {
     const inserted = await client.query<{ atendimento_id: string; numeric_id: number }>(
       `
         INSERT INTO atendimentos (
@@ -519,14 +549,14 @@ export class PostgresWhatsAppRepository implements WhatsAppRepository {
         )
         RETURNING atendimento_id, abs(hashtext(atendimento_id::text)) AS numeric_id
       `,
-      [customer.customerId, options.status, options.handoffRequested ?? false, leadId, options.intent ?? null, options.stage ?? null, phone],
+      [customerId, options.status, options.handoffRequested ?? false, leadId, options.intent ?? null, options.stage ?? null, phone],
     );
 
     return {
       atendimentoUuid: inserted.rows[0]!.atendimento_id,
       numericId: Number(inserted.rows[0]!.numeric_id),
-      phone: customer.phone,
-      customerName: customer.name,
+      phone,
+      customerName,
     };
   }
 

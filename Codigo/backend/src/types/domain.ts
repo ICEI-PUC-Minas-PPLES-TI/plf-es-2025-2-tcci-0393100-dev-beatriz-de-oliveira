@@ -93,10 +93,17 @@ export interface Atendimento {
   status: AtendimentoStatus;
   ultima_mensagem: string;
   horario: string;
+  iniciadoEm?: string;
+  encerradoEm?: string | null;
+  ultimaInteracaoEm?: string | null;
   channel?: ConversationChannel;
   leadId?: number;
   leadStatus?: LeadStatus;
   leadStatusSuggestion?: Extract<LeadStatus, "CONVERTIDO" | "PERDIDO">;
+}
+
+export interface AtendimentoHistorico extends Atendimento {
+  messages: Mensagem[];
 }
 
 export interface Mensagem {

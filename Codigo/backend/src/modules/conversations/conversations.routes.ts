@@ -47,6 +47,29 @@ export async function conversationsRoutes(fastify: FastifyInstance) {
     },
   );
 
+  fastify.get(
+    "/:conversationId/previous",
+    {
+      schema: {
+        tags: ["Conversations"],
+        summary: "Lista atendimentos anteriores do mesmo cliente/canal",
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["conversationId"],
+          properties: {
+            conversationId: { type: "number" },
+          },
+        },
+      },
+    },
+    async (request) => {
+      const params = request.params as { conversationId: number };
+      const data = await container.conversationsService.listPreviousConversations(params.conversationId);
+      return { data };
+    },
+  );
+
   fastify.post(
     "/:conversationId/messages",
     {
@@ -73,7 +96,48 @@ export async function conversationsRoutes(fastify: FastifyInstance) {
     async (request) => {
       const params = request.params as { conversationId: number };
       const body = request.body as { content: string };
-      const data = await container.conversationsService.sendMessage(params.conversationId, body.content.trim());
+      try {
+        const data = await container.conversationsService.sendMessage(params.conversationId, body.content.trim());
+        return { data };
+      } catch (error) {
+        console.error("[ConversationsManualSend] route_failed", {
+          conversationId: params.conversationId,
+          error: error instanceof Error ? error.message : "unknown_error",
+          stack: error instanceof Error ? error.stack : undefined,
+          code: typeof error === "object" && error !== null && "code" in error ? String((error as { code?: unknown }).code) : undefined,
+        });
+        throw error;
+      }
+    },
+  );
+
+  fastify.patch(
+    "/:conversationId/status",
+    {
+      schema: {
+        tags: ["Conversations"],
+        summary: "Atualiza status operacional de uma conversa",
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["conversationId"],
+          properties: {
+            conversationId: { type: "number" },
+          },
+        },
+        body: {
+          type: "object",
+          required: ["status"],
+          properties: {
+            status: { type: "string", enum: ["ATIVO", "PENDENTE", "ENCERRADO"] },
+          },
+        },
+      },
+    },
+    async (request) => {
+      const params = request.params as { conversationId: number };
+      const body = request.body as { status: "ATIVO" | "PENDENTE" | "ENCERRADO" };
+      const data = await container.conversationsService.updateStatus(params.conversationId, body.status);
       return { data };
     },
   );

@@ -17,6 +17,7 @@ import {
 } from "../mocks/mockData";
 import type {
   Atendimento,
+  AtendimentoHistorico,
   BillingRule,
   ConversationChannel,
   DashboardSummary,
@@ -261,6 +262,12 @@ export const adminDataService = {
   listConversationMessages: (conversationId: number) =>
     (async () => (await httpClient.get<ApiListResponse<Mensagem>>(API_ENDPOINTS.conversationMessages(conversationId))).data)(),
 
+  listPreviousConversations: (conversationId: number) =>
+    getMockOrApiData<AtendimentoHistorico[]>(
+      () => [],
+      async () => (await httpClient.get<ApiListResponse<AtendimentoHistorico>>(API_ENDPOINTS.conversationPrevious(conversationId))).data,
+    ),
+
   sendConversationMessage: (payload: { conversationId: number; content: string }) =>
     getMockOrApiData<Mensagem>(
       () => {
@@ -297,6 +304,21 @@ export const adminDataService = {
       },
       async () =>
         (await httpClient.patch<ApiItemResponse<Atendimento>>(API_ENDPOINTS.whatsappConversationStatus(atendimentoId), { status })).data,
+    ),
+
+  updateConversationStatus: (conversationId: number, status: Atendimento["status"]) =>
+    getMockOrApiData<Atendimento>(
+      () => {
+        const index = ATENDIMENTOS.findIndex((item) => item.id === conversationId);
+        if (index < 0) {
+          throw new Error("Atendimento nao encontrado");
+        }
+        const updated: Atendimento = { ...ATENDIMENTOS[index], status };
+        ATENDIMENTOS[index] = updated;
+        return updated;
+      },
+      async () =>
+        (await httpClient.patch<ApiItemResponse<Atendimento>>(API_ENDPOINTS.conversationStatus(conversationId), { status })).data,
     ),
 
   sendWhatsAppMessage: (payload: { atendimentoId?: number; telefone?: string; texto: string }) =>

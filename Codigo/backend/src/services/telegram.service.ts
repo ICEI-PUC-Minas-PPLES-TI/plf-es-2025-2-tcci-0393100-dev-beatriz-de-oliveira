@@ -96,6 +96,55 @@ export class TelegramService {
       preview: message.text.slice(0, 80),
     });
 
+    const runtimeState = await this.repository.getConversationAutomationStateByChatId(message.from);
+    const isHumanHandoffActive = Boolean(
+      runtimeState &&
+        runtimeState.status !== "ENCERRADO" &&
+        (runtimeState.handoffRequested || runtimeState.stage === "ENCAMINHADO_HUMANO"),
+    );
+
+    if (isHumanHandoffActive) {
+      this.chatbotCore.pauseConversation(message.from);
+      const savedConversation = await this.repository.saveIncomingMessage({
+        chatId: message.from,
+        customerName: message.profileName,
+        text: message.text,
+        messageId: message.messageId,
+        timestamp: message.timestamp,
+        status: "PENDENTE",
+        handoffRequested: true,
+        intent: runtimeState?.intent ?? "human_handoff",
+        stage: runtimeState?.stage ?? "ENCAMINHADO_HUMANO",
+      });
+
+      await this.leadStatusService.updateLeadStatusFromConversation(savedConversation.atendimentoId);
+
+      console.info("[TelegramService] inbound_suppressed_handoff", {
+        chatId: message.from,
+        atendimentoId: savedConversation.atendimentoId,
+        messageId: message.messageId,
+      });
+
+      return {
+        consumed: true,
+        extractedMessages: 1,
+        responses: [],
+        messageResults: [
+          {
+            phone: message.from,
+            messageId: message.messageId,
+            originalText: message.text,
+            profileName: message.profileName,
+            status: "suppressed",
+          },
+        ],
+      };
+    }
+
+    if (runtimeState && (runtimeState.status === "ENCERRADO" || runtimeState.handoffRequested)) {
+      this.chatbotCore.resumeConversation(message.from);
+    }
+
     let savedConversation;
     try {
       console.info("[TelegramService] inbound_persist_start", {
@@ -109,6 +158,10 @@ export class TelegramService {
         text: message.text,
         messageId: message.messageId,
         timestamp: message.timestamp,
+        status: "ATIVO",
+        handoffRequested: false,
+        intent: runtimeState?.intent ?? undefined,
+        stage: runtimeState?.status === "ENCERRADO" ? "IDLE" : undefined,
       });
     } catch (error) {
       console.error("[TelegramService] inbound_persist_failed", {
@@ -189,6 +242,12 @@ export class TelegramService {
   }
 
   async sendManualMessage(input: { atendimentoId?: number; chatId?: string; texto: string }) {
+    console.info("[TelegramManualSend] start", {
+      atendimentoId: input.atendimentoId ?? null,
+      chatId: input.chatId ?? null,
+      preview: input.texto.slice(0, 80),
+    });
+
     let chatId = input.chatId?.trim();
 
     if (!chatId && input.atendimentoId !== undefined) {
@@ -197,19 +256,60 @@ export class TelegramService {
         throw new AppError("Conversation not found", 404, "TELEGRAM_CONVERSATION_NOT_FOUND");
       }
       chatId = conversation.chatId;
+      console.info("[TelegramManualSend] conversation_found", {
+        atendimentoId: conversation.atendimentoId,
+        chatId: conversation.chatId,
+      });
     }
 
     if (!chatId) {
       throw new AppError("Telegram chat id is required", 400, "TELEGRAM_CHAT_ID_REQUIRED");
     }
 
-    return this.sendTextMessage(chatId, input.texto, undefined, {
-      sender: "ATENDENTE",
-      status: "PENDENTE",
-      handoffRequested: true,
-      intent: "human_handoff",
-      stage: "ENCAMINHADO_HUMANO",
-    });
+    try {
+      const savedMessage = await this.sendTextMessage(chatId, input.texto, undefined, {
+        sender: "ATENDENTE",
+        status: "PENDENTE",
+        handoffRequested: true,
+        intent: "human_handoff",
+        stage: "ENCAMINHADO_HUMANO",
+      });
+
+      console.info("[TelegramManualSend] completed", {
+        atendimentoId: savedMessage.conversationId ?? input.atendimentoId ?? null,
+        chatId,
+        messageId: savedMessage.id,
+      });
+
+      return savedMessage;
+    } catch (error) {
+      console.error("[TelegramManualSend] failed", {
+        atendimentoId: input.atendimentoId ?? null,
+        chatId,
+        error: formatErrorDetails(error),
+      });
+      throw error;
+    }
+  }
+
+  async updateConversationStatus(conversationId: number, status: "ATIVO" | "PENDENTE" | "ENCERRADO") {
+    const conversation = await this.repository.findConversationById(conversationId);
+    if (!conversation) {
+      throw new AppError("Conversation not found", 404, "TELEGRAM_CONVERSATION_NOT_FOUND");
+    }
+
+    const updated = await this.repository.updateConversationStatus(conversationId, status);
+    if (!updated) {
+      throw new AppError("Conversation not found", 404, "TELEGRAM_CONVERSATION_NOT_FOUND");
+    }
+
+    if (status === "ATIVO") {
+      this.chatbotCore.resumeConversation(conversation.chatId);
+    } else {
+      this.chatbotCore.pauseConversation(conversation.chatId);
+    }
+
+    return updated;
   }
 
   private buildDeliveryState(response: ChatbotResponse) {
@@ -324,6 +424,14 @@ export class TelegramService {
     },
   ): Promise<Mensagem> {
     try {
+      console.info("[TelegramOutbound] send_text_start", {
+        chatId,
+        sender: options?.sender ?? "CHATBOT",
+        status: options?.status ?? null,
+        handoffRequested: options?.handoffRequested ?? false,
+        stage: options?.stage ?? null,
+        preview: text.slice(0, 80),
+      });
       const token = this.getBotToken();
       const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
         method: "POST",
@@ -341,6 +449,11 @@ export class TelegramService {
         const payload = (await response.json().catch(() => null)) as TelegramApiErrorPayload | null;
         throw new AppError(payload?.description ?? `Telegram API returned ${response.status}`, 502, "TELEGRAM_SEND_FAILED");
       }
+
+      console.info("[TelegramOutbound] send_text_success", {
+        chatId,
+        sender: options?.sender ?? "CHATBOT",
+      });
 
       const savedMessage = await this.repository.saveOutgoingMessage({
         chatId,
@@ -363,6 +476,11 @@ export class TelegramService {
       if (savedMessage.conversationId) {
         await this.leadStatusService.updateLeadStatusFromConversation(savedMessage.conversationId);
       }
+      console.info("[TelegramOutbound] response_ready", {
+        chatId,
+        conversationId: savedMessage.conversationId ?? null,
+        messageId: savedMessage.id,
+      });
       return savedMessage;
     } catch (error) {
       const failedMessage = await this.repository.saveOutgoingMessage({
@@ -386,6 +504,11 @@ export class TelegramService {
       if (failedMessage.conversationId) {
         await this.leadStatusService.updateLeadStatusFromConversation(failedMessage.conversationId);
       }
+      console.error("[TelegramOutbound] send_text_failed", {
+        chatId,
+        sender: options?.sender ?? "CHATBOT",
+        error: formatErrorDetails(error),
+      });
       throw error;
     }
   }

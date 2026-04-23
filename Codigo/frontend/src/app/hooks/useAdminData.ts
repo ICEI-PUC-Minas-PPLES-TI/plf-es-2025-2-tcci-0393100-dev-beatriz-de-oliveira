@@ -4,6 +4,7 @@ import { adminDataService } from "../services/adminDataService";
 import { useAsyncData } from "./useAsyncData";
 import type {
   Atendimento,
+  AtendimentoHistorico,
   BillingRule,
   ConversationChannel,
   DashboardSummary,
@@ -70,6 +71,17 @@ export function useConversationMessagesData(conversationId: number | null) {
   }, [conversationId]);
 
   return useAsyncData<Mensagem[]>(loader, [], { enabled: conversationId !== null });
+}
+
+export function usePreviousConversationsData(conversationId: number | null, enabled = true) {
+  const loader = useCallback(() => {
+    if (conversationId === null) {
+      return Promise.resolve([] as AtendimentoHistorico[]);
+    }
+    return adminDataService.listPreviousConversations(conversationId);
+  }, [conversationId]);
+
+  return useAsyncData<AtendimentoHistorico[]>(loader, [], { enabled: enabled && conversationId !== null });
 }
 
 export function useMetricasData(periodo?: DateRange, enabled = true) {
