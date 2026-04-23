@@ -15,9 +15,12 @@ class ValidationProductsRepository {
     return (this.items.find((item) => item.id === id) ?? null) as never;
   }
 
-  async searchByName(term: string) {
-    const normalizedTerm = term.toLowerCase();
-    return this.items.filter((item) => String(item.nome).toLowerCase().includes(normalizedTerm)) as never[];
+  async searchByName(input: { extractedTerm: string; requiredTokens: string[] }) {
+    const normalizedTerm = input.extractedTerm.toLowerCase();
+    return this.items.filter((item) => {
+      const normalizedName = String(item.nome).toLowerCase();
+      return normalizedName.includes(normalizedTerm) || input.requiredTokens.some((token) => normalizedName.includes(token));
+    }) as never[];
   }
 
   async create(data: Record<string, unknown>) {

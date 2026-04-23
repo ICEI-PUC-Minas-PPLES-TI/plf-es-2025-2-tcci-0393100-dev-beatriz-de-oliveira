@@ -255,7 +255,7 @@ export function Conversas() {
   }, [selectedConversation?.id, reloadConversations, reloadMessages]);
 
   const isWhatsAppConversation = selectedConversation?.channel === "whatsapp";
-  const canSendManualMessage = Boolean(selectedConversation && isWhatsAppConversation && selectedConversation.status !== "ENCERRADO");
+  const canSendManualMessage = Boolean(selectedConversation && selectedConversation.status !== "ENCERRADO");
   const canUpdateStatus = Boolean(selectedConversation && isWhatsAppConversation);
   const canFinalizeOrder = Boolean(selectedConversation && selectedConversation.status !== "ENCERRADO");
 
@@ -296,20 +296,18 @@ export function Conversas() {
       return;
     }
 
-    if (!isWhatsAppConversation) {
-      toast.error("O envio manual no painel está disponível apenas para conversas do WhatsApp no momento.");
-      return;
-    }
-
     setIsSendingMessage(true);
     try {
-      await adminDataService.sendWhatsAppMessage({ atendimentoId: selectedConversation.id, texto: newMessage.trim() });
+      await adminDataService.sendConversationMessage({ conversationId: selectedConversation.id, content: newMessage.trim() });
       setNewMessage("");
       await Promise.all([reloadMessages(), reloadConversations()]);
       toast.success("Mensagem enviada");
     } catch (error) {
-      if (error instanceof HttpError && error.payload?.code === "WHATSAPP_OUTBOUND_NOT_CONFIGURED") {
-        toast.error("O envio manual ainda não está configurado neste ambiente.");
+      if (
+        error instanceof HttpError &&
+        (error.payload?.code === "WHATSAPP_OUTBOUND_NOT_CONFIGURED" || error.payload?.code === "TELEGRAM_BOT_NOT_CONFIGURED")
+      ) {
+        toast.error("O provedor de envio deste canal ainda não está configurado neste ambiente.");
       } else {
         const message = error instanceof Error ? error.message : "Falha ao enviar mensagem";
         toast.error(message);
@@ -645,11 +643,9 @@ export function Conversas() {
                     </div>
                   </div>
 
-                  {!isWhatsAppConversation && (
-                    <p className="text-xs text-muted-foreground">
-                      Algumas ações operacionais do painel, como envio manual e alteração de status, seguem disponíveis apenas para atendimentos de WhatsApp.
-                    </p>
-                  )}
+                  <p className="text-xs text-muted-foreground">
+                    O envio manual funciona no canal da conversa. O encerramento operacional segue as regras disponíveis para cada canal.
+                  </p>
                 </div>
               </div>
 
@@ -692,14 +688,12 @@ export function Conversas() {
                 <div className="mb-2 text-xs text-muted-foreground">
                   {selectedConversation.status === "ENCERRADO"
                     ? "Conversa encerrada. Reabra o atendimento no fluxo operacional para voltar a interagir."
-                    : isWhatsAppConversation
-                      ? "O envio manual depende da configuração de outbound do WhatsApp neste ambiente."
-                      : "O envio manual para Telegram ainda não está disponível neste painel."}
+                    : "O envio manual usa a integração ativa do canal desta conversa."}
                 </div>
 
                 <div className="flex gap-2">
                   <Input
-                    placeholder={isWhatsAppConversation ? "Digite sua mensagem..." : "Envio manual indisponível para este canal"}
+                    placeholder="Digite sua mensagem..."
                     value={newMessage}
                     onChange={(event) => setNewMessage(event.target.value)}
                     onKeyDown={(event) => {

@@ -46,6 +46,7 @@ export interface ChatbotConversationState {
   lastMessageAt: string;
   handoffRequested: boolean;
   awaitingHumanHandoffDecision: boolean;
+  awaitingProductSelectionForInterest: boolean;
   lastShownProducts: string[];
   lastSuggestedCategories: string[];
   selectedProductName?: string;
@@ -88,6 +89,7 @@ export interface ChatbotResponse {
       | "stage"
       | "handoffRequested"
       | "awaitingHumanHandoffDecision"
+      | "awaitingProductSelectionForInterest"
       | "lastShownProducts"
       | "lastSuggestedCategories"
       | "selectedProductName"

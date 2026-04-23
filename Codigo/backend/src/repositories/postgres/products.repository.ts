@@ -1,6 +1,6 @@
 import { pool } from "../../config/database.js";
 import type { Produto } from "../../types/domain.js";
-import type { ProductsRepository } from "../products.repository.js";
+import type { ProductSearchInput, ProductsRepository } from "../products.repository.js";
 
 type ProductRow = {
   produto_id: number;
@@ -46,21 +46,33 @@ export class PostgresProductsRepository implements ProductsRepository {
     return row ? this.mapRowToDomain(row, columns) : null;
   }
 
-  async searchByName(term: string): Promise<Produto[]> {
+  async searchByName(input: ProductSearchInput): Promise<Produto[]> {
     const columns = await this.getOptionalColumns();
+    const conditions: string[] = [];
+    const values: unknown[] = [];
+
+    if (input.extractedTerm.trim()) {
+      values.push(`%${input.extractedTerm.trim()}%`);
+      conditions.push(`unaccent(lower(nome)) LIKE unaccent(lower($${values.length}))`);
+    }
+
+    for (const token of input.requiredTokens) {
+      values.push(`%${token}%`);
+      conditions.push(
+        `(unaccent(lower(nome)) LIKE unaccent(lower($${values.length})) OR unaccent(lower(categoria)) LIKE unaccent(lower($${values.length})))`,
+      );
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" OR ")}` : "";
     const query = `
       SELECT ${this.buildSelectColumns(columns)}
       FROM produtos
-      WHERE nome ILIKE $1
-      ORDER BY
-        CASE WHEN nome ILIKE $2 THEN 0 ELSE 1 END,
-        produto_id ASC
-      LIMIT 5
+      ${whereClause}
+      ORDER BY produto_id ASC
+      LIMIT 25
     `;
 
-    const partialTerm = `%${term.trim()}%`;
-    const startsWithTerm = `${term.trim()}%`;
-    const result = await pool.query<ProductRow>(query, [partialTerm, startsWithTerm]);
+    const result = await pool.query<ProductRow>(query, values);
     return result.rows.map((row) => this.mapRowToDomain(row, columns));
   }
 

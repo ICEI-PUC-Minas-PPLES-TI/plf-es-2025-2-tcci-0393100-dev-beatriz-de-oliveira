@@ -107,7 +107,8 @@ export function detectIntent(normalizedText: string, state: ChatbotConversationS
   }
 
   if (state.stage === "AGUARDANDO_ESCOLHA_PRODUTO") {
-    if (parseProductChoice(normalizedText, state.lastShownProducts.length) !== null) return "lead_interest";
+    const choiceIndex = parseProductChoice(normalizedText, state.lastShownProducts.length);
+    if (choiceIndex !== null) return state.awaitingProductSelectionForInterest ? "lead_interest" : "products";
 
     const mentionsKnownProduct = state.lastShownProducts.some((productName) =>
       normalizedText.includes(normalizeMessageText(productName)),
@@ -116,6 +117,7 @@ export function detectIntent(normalizedText: string, state: ChatbotConversationS
       if (hasAnyKeyword(normalizedText, HUMAN_HANDOFF_KEYWORDS)) return "human_handoff";
       if (hasAnyKeyword(normalizedText, LEAD_INTEREST_KEYWORDS) || isAffirmativeMessage(normalizedText)) return "lead_interest";
       if (hasAnyKeyword(normalizedText, PRODUCTS_KEYWORDS)) return "products";
+      return state.awaitingProductSelectionForInterest ? "lead_interest" : "products";
     }
 
     if (isAffirmativeMessage(normalizedText)) return "lead_interest";

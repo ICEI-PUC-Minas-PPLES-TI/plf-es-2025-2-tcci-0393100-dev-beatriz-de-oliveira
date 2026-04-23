@@ -9,6 +9,7 @@ import {
   buildCommercialHandoffText,
   buildMainMenuKeyboard,
   buildProductActionsKeyboard,
+  buildProductListKeyboard,
   buildUnknownCategoryText,
 } from "./shared.js";
 
@@ -82,6 +83,7 @@ export class ProductsHandler implements IntentHandler {
           },
           stateTransition: {
             stage: "AGUARDANDO_ESCOLHA_PRODUTO",
+            awaitingProductSelectionForInterest: false,
             lastShownProducts: [selectedProduct.nome],
             lastSuggestedCategories: context.state.lastSuggestedCategories,
             selectedCategoryName: context.state.selectedCategoryName,
@@ -104,6 +106,7 @@ export class ProductsHandler implements IntentHandler {
         },
         stateTransition: {
           stage: "AGUARDANDO_CATEGORIA",
+          awaitingProductSelectionForInterest: false,
           lastShownProducts: [],
           lastSuggestedCategories: categories,
           selectedCategoryName: undefined,
@@ -131,6 +134,7 @@ export class ProductsHandler implements IntentHandler {
         },
         stateTransition: {
           stage: "AGUARDANDO_CATEGORIA",
+          awaitingProductSelectionForInterest: false,
           lastShownProducts: [],
           lastSuggestedCategories: categories,
           selectedCategoryName: undefined,
@@ -163,6 +167,7 @@ export class ProductsHandler implements IntentHandler {
         },
         stateTransition: {
           stage: "AGUARDANDO_CATEGORIA",
+          awaitingProductSelectionForInterest: false,
           lastShownProducts: [],
           lastSuggestedCategories: categories,
           selectedCategoryName: categoryMatch.matchedCategory,
@@ -171,7 +176,8 @@ export class ProductsHandler implements IntentHandler {
       };
     }
 
-    const firstProduct = filteredProducts[0]!;
+    const displayedProducts = filteredProducts.slice(0, 3);
+    const selectedProductName = displayedProducts.length === 1 ? displayedProducts[0]!.nome : undefined;
 
     return {
       intent: this.intent,
@@ -184,16 +190,20 @@ export class ProductsHandler implements IntentHandler {
       actions: ["list_products_by_category", "await_product_choice"],
       handoffRequested: false,
       telegram: {
-        inlineKeyboard: buildProductActionsKeyboard(firstProduct.nome),
+        inlineKeyboard:
+          displayedProducts.length === 1
+            ? buildProductActionsKeyboard(displayedProducts[0]!.nome)
+            : buildProductListKeyboard(displayedProducts.map((item) => item.nome)),
         keyboardPrompt: "Escolha uma ação abaixo 👇",
       },
       stateTransition: {
         stage: "AGUARDANDO_ESCOLHA_PRODUTO",
         awaitingHumanHandoffDecision: false,
-        lastShownProducts: filteredProducts.slice(0, 3).map((item) => item.nome),
+        awaitingProductSelectionForInterest: false,
+        lastShownProducts: displayedProducts.map((item) => item.nome),
         lastSuggestedCategories: categories,
         selectedCategoryName: categoryMatch.matchedCategory,
-        selectedProductName: firstProduct.nome,
+        selectedProductName,
       },
     };
   }

@@ -261,6 +261,29 @@ export const adminDataService = {
   listConversationMessages: (conversationId: number) =>
     (async () => (await httpClient.get<ApiListResponse<Mensagem>>(API_ENDPOINTS.conversationMessages(conversationId))).data)(),
 
+  sendConversationMessage: (payload: { conversationId: number; content: string }) =>
+    getMockOrApiData<Mensagem>(
+      () => {
+        const nextId = Math.max(0, ...MENSAGENS.map((item) => item.id)) + 1;
+        const created: Mensagem = {
+          id: nextId,
+          tipo: "enviada",
+          conteudo: payload.content,
+          horario: new Date().toISOString(),
+          remetente: "ATENDENTE",
+          conversationId: payload.conversationId,
+        };
+        MENSAGENS.push(created);
+        return created;
+      },
+      async () =>
+        (
+          await httpClient.post<ApiItemResponse<Mensagem>>(API_ENDPOINTS.conversationSendMessage(payload.conversationId), {
+            content: payload.content,
+          })
+        ).data,
+    ),
+
   updateAtendimentoStatus: (atendimentoId: number, status: Atendimento["status"]) =>
     getMockOrApiData<Atendimento>(
       () => {

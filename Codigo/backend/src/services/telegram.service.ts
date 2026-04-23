@@ -2,7 +2,7 @@ import { env } from "../config/env.js";
 import type { ChatbotCoreService } from "../modules/chatbot/chatbot-core.service.js";
 import type { TelegramRepository } from "../repositories/telegram.repository.js";
 import type { ChatbotProcessResult, ChatbotResponse } from "../modules/chatbot/types.js";
-import type { Produto } from "../types/domain.js";
+import type { Mensagem, Produto } from "../types/domain.js";
 import { AppError } from "../utils/app-error.js";
 import type { ProductsService } from "./products.service.js";
 import type { LeadStatusService } from "./lead-status.service.js";
@@ -188,6 +188,24 @@ export class TelegramService {
     return result;
   }
 
+  async sendManualMessage(input: { atendimentoId?: number; chatId?: string; texto: string }) {
+    let chatId = input.chatId?.trim();
+
+    if (!chatId && input.atendimentoId !== undefined) {
+      const conversation = await this.repository.findConversationById(input.atendimentoId);
+      if (!conversation) {
+        throw new AppError("Conversation not found", 404, "TELEGRAM_CONVERSATION_NOT_FOUND");
+      }
+      chatId = conversation.chatId;
+    }
+
+    if (!chatId) {
+      throw new AppError("Telegram chat id is required", 400, "TELEGRAM_CHAT_ID_REQUIRED");
+    }
+
+    return this.sendTextMessage(chatId, input.texto, undefined, "ATENDENTE");
+  }
+
   private async sendChatbotResponse(chatId: string, response: ChatbotResponse): Promise<void> {
     if (!response.replyText?.trim()) {
       console.warn("[Telegram] Resposta vazia do chatbot", {
@@ -278,7 +296,8 @@ export class TelegramService {
     chatId: string,
     text: string,
     inlineKeyboard?: Array<Array<{ text: string; callbackData: string }>>,
-  ): Promise<void> {
+    sender: "CHATBOT" | "ATENDENTE" = "CHATBOT",
+  ): Promise<Mensagem> {
     try {
       const token = this.getBotToken();
       const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
@@ -303,6 +322,7 @@ export class TelegramService {
         text,
         type: "text",
         statusEntrega: "ENVIADA",
+        sender,
       });
       console.info("[TelegramService] outbound_persisted", {
         chatId,
@@ -314,12 +334,14 @@ export class TelegramService {
       if (savedMessage.conversationId) {
         await this.leadStatusService.updateLeadStatusFromConversation(savedMessage.conversationId);
       }
+      return savedMessage;
     } catch (error) {
       const failedMessage = await this.repository.saveOutgoingMessage({
         chatId,
         text,
         type: "text",
         statusEntrega: "FALHA",
+        sender,
       });
       console.error("[TelegramService] outbound_persist_failed_send", {
         chatId,

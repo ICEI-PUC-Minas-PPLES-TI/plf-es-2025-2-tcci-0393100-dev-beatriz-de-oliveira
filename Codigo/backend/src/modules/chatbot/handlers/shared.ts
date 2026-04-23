@@ -47,6 +47,32 @@ export function buildProductActionsKeyboard(productName: string) {
   ];
 }
 
+export function buildProductListKeyboard(productNames: string[]) {
+  const rows: Array<Array<{ text: string; callbackData: string }>> = [];
+
+  productNames.slice(0, 3).forEach((productName, index) => {
+    rows.push([
+      { text: `Ver item ${index + 1}`, callbackData: `PRODUCT:MORE:${productName}` },
+      { text: `Interesse item ${index + 1}`, callbackData: `PRODUCT:INTEREST:${productName}` },
+    ]);
+  });
+
+  rows.push([{ text: "Falar com vendedor", callbackData: "MENU:HUMAN_HANDOFF" }]);
+  return rows;
+}
+
+export function buildInterestSelectionKeyboard(productNames: string[]) {
+  const rows = productNames.slice(0, 3).map((productName, index) => [
+    {
+      text: `Tenho interesse no item ${index + 1}`,
+      callbackData: `PRODUCT:INTEREST:${productName}`,
+    },
+  ]);
+
+  rows.push([{ text: "Falar com vendedor", callbackData: "MENU:HUMAN_HANDOFF" }]);
+  return rows;
+}
+
 export function buildHandoffKeyboard() {
   return [
     [

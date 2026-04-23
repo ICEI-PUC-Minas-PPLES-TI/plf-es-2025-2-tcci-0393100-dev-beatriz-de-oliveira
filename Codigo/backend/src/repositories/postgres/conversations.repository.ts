@@ -7,6 +7,7 @@ type ConversationRow = {
   numeric_id: number;
   cliente: string | null;
   telefone: string | null;
+  contact_id: string | null;
   status: string | null;
   ultima_mensagem: string | null;
   horario: string | null;
@@ -41,6 +42,7 @@ export class PostgresConversationsRepository implements ConversationsRepository 
           abs(hashtext(a.atendimento_id::text)) AS numeric_id,
           c.nome AS cliente,
           c.telefone,
+          a.whatsapp_chat_id AS contact_id,
           a.status,
           a.canal,
           lm.conteudo AS ultima_mensagem,
@@ -64,6 +66,7 @@ export class PostgresConversationsRepository implements ConversationsRepository 
       id: Number(row.numeric_id),
       cliente: row.cliente ?? row.telefone ?? "Cliente sem nome",
       telefone: row.telefone ?? "",
+      contactId: row.canal?.toLowerCase() === "telegram" ? row.contact_id ?? "" : undefined,
       status: row.status === "ENCERRADO" ? "ENCERRADO" : row.status === "PENDENTE" ? "PENDENTE" : "ATIVO",
       ultima_mensagem: row.ultima_mensagem ?? "",
       horario: row.horario ?? new Date().toISOString(),
@@ -96,5 +99,52 @@ export class PostgresConversationsRepository implements ConversationsRepository 
       remetente: row.remetente ?? undefined,
       conversationId,
     }));
+  }
+
+  async findConversationById(conversationId: number): Promise<Atendimento | null> {
+    const result = await pool.query<ConversationRow>(
+      `
+        SELECT
+          a.atendimento_id,
+          abs(hashtext(a.atendimento_id::text)) AS numeric_id,
+          c.nome AS cliente,
+          c.telefone,
+          a.whatsapp_chat_id AS contact_id,
+          a.status,
+          a.canal,
+          lm.conteudo AS ultima_mensagem,
+          COALESCE(lm.data_envio, a.ultima_interacao_em, a.iniciado_em) AS horario
+        FROM atendimentos a
+        LEFT JOIN clientes c ON c.cliente_id = a.cliente_id
+        LEFT JOIN LATERAL (
+          SELECT m.conteudo, m.data_envio
+          FROM mensagens m
+          WHERE m.atendimento_id = a.atendimento_id
+          ORDER BY m.xmin::text::bigint DESC, m.data_envio DESC NULLS LAST, m.mensagem_id DESC
+          LIMIT 1
+        ) lm ON TRUE
+        WHERE abs(hashtext(a.atendimento_id::text)) = $1
+        LIMIT 1
+      `,
+      [conversationId],
+    );
+
+    const row = result.rows[0];
+    if (!row) {
+      return null;
+    }
+
+    const channel = row.canal?.toLowerCase() === "telegram" ? "telegram" : "whatsapp";
+
+    return {
+      id: Number(row.numeric_id),
+      cliente: row.cliente ?? row.telefone ?? "Cliente sem nome",
+      telefone: row.telefone ?? "",
+      contactId: channel === "telegram" ? row.contact_id ?? "" : undefined,
+      status: row.status === "ENCERRADO" ? "ENCERRADO" : row.status === "PENDENTE" ? "PENDENTE" : "ATIVO",
+      ultima_mensagem: row.ultima_mensagem ?? "",
+      horario: row.horario ?? new Date().toISOString(),
+      channel,
+    };
   }
 }

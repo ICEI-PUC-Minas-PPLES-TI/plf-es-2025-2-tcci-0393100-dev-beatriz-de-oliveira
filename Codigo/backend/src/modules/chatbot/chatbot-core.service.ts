@@ -9,7 +9,12 @@ import { normalizeIncomingMessage, normalizeMessageText } from "./message-normal
 import { findMatchingProducts } from "./product-resolver.js";
 import { MessageRouter } from "./message-router.js";
 import { GreetingHandler } from "./handlers/greeting.handler.js";
-import { buildCommercialHandoffText, buildHandoffKeyboard, buildProductActionsKeyboard } from "./handlers/shared.js";
+import {
+  buildCommercialHandoffText,
+  buildHandoffKeyboard,
+  buildProductActionsKeyboard,
+  buildProductListKeyboard,
+} from "./handlers/shared.js";
 import { HumanHandoffHandler } from "./handlers/human-handoff.handler.js";
 import { LeadHandler } from "./handlers/lead.handler.js";
 import { MenuHandler } from "./handlers/menu.handler.js";
@@ -364,6 +369,7 @@ export class ChatbotCoreService {
           stage: "ENCAMINHADO_HUMANO",
           handoffRequested: true,
           awaitingHumanHandoffDecision: false,
+          awaitingProductSelectionForInterest: false,
           lastShownProducts: [],
           lastSuggestedCategories: [],
           selectedCategoryName: undefined,
@@ -401,6 +407,7 @@ export class ChatbotCoreService {
       stateTransition: {
         stage: "CONSULTANDO_PRODUTOS",
         awaitingHumanHandoffDecision: true,
+        awaitingProductSelectionForInterest: false,
         selectedProductName: state.selectedProductName,
         selectedCategoryName: state.selectedCategoryName,
         pendingIntentAfterName: undefined,
@@ -434,6 +441,7 @@ export class ChatbotCoreService {
         stateTransition: {
           stage: "CONSULTANDO_PRODUTOS",
           awaitingHumanHandoffDecision: true,
+          awaitingProductSelectionForInterest: false,
           lastShownProducts: [product.nome],
           selectedProductName: product.nome,
         },
@@ -460,14 +468,15 @@ export class ChatbotCoreService {
       actions: ["product_search_override", "product_list_found", "await_product_choice"],
       handoffRequested: false,
       telegram: {
-        inlineKeyboard: buildProductActionsKeyboard(products[0]!.nome),
+        inlineKeyboard: buildProductListKeyboard(products.slice(0, 3).map((product) => product.nome)),
         keyboardPrompt: "Escolha uma ação para continuar.",
       },
       stateTransition: {
         stage: "AGUARDANDO_ESCOLHA_PRODUTO",
         awaitingHumanHandoffDecision: false,
+        awaitingProductSelectionForInterest: false,
         lastShownProducts: products.slice(0, 3).map((product) => product.nome),
-        selectedProductName: products[0]!.nome,
+        selectedProductName: undefined,
       },
     };
   }
@@ -475,15 +484,19 @@ export class ChatbotCoreService {
   private async tryProductSearchOverride(context: ChatbotContext): Promise<ChatbotResponse | null> {
     const productSearch = await findMatchingProducts(
       context.message.originalText,
-      (term) => this.productsService.searchByName(term),
+      (input) => this.productsService.searchByName(input),
       () => this.productsService.list(),
     );
     this.logger.info(
       {
         event: "product_search_attempt",
         phone: context.message.from,
-        searchedProduct: productSearch.searchedProduct,
+        originalText: productSearch.searchedProduct,
+        extractedTerm: productSearch.extractedTerm,
+        tokensUsed: productSearch.requiredTokens,
         resultsFound: productSearch.products.length,
+        scoredProducts: productSearch.matchedProducts,
+        discardedProducts: productSearch.discardedProducts.slice(0, 10),
       },
       "[ChatbotProduct]",
     );
@@ -496,8 +509,10 @@ export class ChatbotCoreService {
       {
         event: "product_search_override",
         phone: context.message.from,
-        searchedProduct: productSearch.searchedProduct,
-        resultsFound: productSearch.products.map((product) => product.nome),
+        originalText: productSearch.searchedProduct,
+        extractedTerm: productSearch.extractedTerm,
+        tokensUsed: productSearch.requiredTokens,
+        resultsFound: productSearch.matchedProducts,
         previousStage: context.state.stage,
       },
       "[ChatbotProduct]",
@@ -612,10 +627,17 @@ export class ChatbotCoreService {
         response = namePrompt ?? (await this.router.route(context));
       }
 
+      const stateTransition = response.stateTransition ?? {};
       const mergedPatch = {
-        ...response.stateTransition,
-        selectedProductName: response.stateTransition?.selectedProductName ?? selectedProductName ?? state.selectedProductName,
-        selectedCategoryName: response.stateTransition?.selectedCategoryName ?? state.selectedCategoryName,
+        ...stateTransition,
+        selectedProductName:
+          "selectedProductName" in stateTransition
+            ? stateTransition.selectedProductName
+            : selectedProductName ?? state.selectedProductName,
+        selectedCategoryName:
+          "selectedCategoryName" in stateTransition ? stateTransition.selectedCategoryName : state.selectedCategoryName,
+        awaitingProductSelectionForInterest:
+          stateTransition.awaitingProductSelectionForInterest ?? state.awaitingProductSelectionForInterest,
       };
       const nextState = this.stateStore.update(normalized.from, {
         intent: response.intent,

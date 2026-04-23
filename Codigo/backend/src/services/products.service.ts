@@ -1,4 +1,4 @@
-import type { ProductsRepository } from "../repositories/products.repository.js";
+import type { ProductSearchInput, ProductsRepository } from "../repositories/products.repository.js";
 import type { Produto } from "../types/domain.js";
 
 export class ProductsService {
@@ -8,8 +8,8 @@ export class ProductsService {
     return this.repository.findAll();
   }
 
-  searchByName(term: string): Promise<Produto[]> {
-    return this.repository.searchByName(term);
+  searchByName(input: ProductSearchInput): Promise<Produto[]> {
+    return this.repository.searchByName(input);
   }
 
   create(data: Omit<Produto, "id">): Promise<Produto> {

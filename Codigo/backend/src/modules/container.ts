@@ -43,19 +43,22 @@ const chatbotCoreService = new ChatbotCoreService({
   promotionsService,
   leadsService,
 });
+const whatsappService = new WhatsAppService(chatbotCoreService, whatsappRepository, leadStatusService);
+const telegramService = new TelegramService(chatbotCoreService, productsService, telegramRepository, leadStatusService);
+const conversationsService = new ConversationsService(conversationsRepository, whatsappService, telegramService);
 
 export const container = {
   authService: new AuthService(authRepository),
   productsService,
   promotionsService,
   leadsService,
-  conversationsService: new ConversationsService(conversationsRepository),
+  conversationsService,
   dashboardService: new DashboardService(dashboardRepository),
   metricsService: new MetricsService(metricsRepository),
   billingService,
   leadStatusService,
   dailyBillingJob: new DailyBillingJob(billingService),
   chatbotCoreService,
-  whatsappService: new WhatsAppService(chatbotCoreService, whatsappRepository, leadStatusService),
-  telegramService: new TelegramService(chatbotCoreService, productsService, telegramRepository, leadStatusService),
+  whatsappService,
+  telegramService,
 };

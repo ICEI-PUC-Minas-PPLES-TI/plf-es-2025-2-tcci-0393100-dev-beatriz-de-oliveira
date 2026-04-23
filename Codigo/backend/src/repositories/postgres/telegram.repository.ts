@@ -113,14 +113,14 @@ export class PostgresTelegramRepository implements TelegramRepository {
             $1,
             $2,
             NOW(),
-            'CHATBOT',
             $3,
             $4,
+            $5,
             'SAIDA'
           )
           RETURNING mensagem_id, abs(hashtext(mensagem_id::text)) AS numeric_id, conteudo, data_envio, direcao, remetente
         `,
-        [conversation.atendimentoUuid, input.text, input.type, input.statusEntrega],
+        [conversation.atendimentoUuid, input.text, input.sender ?? "CHATBOT", input.type, input.statusEntrega],
       );
 
       await client.query(
@@ -168,6 +168,35 @@ export class PostgresTelegramRepository implements TelegramRepository {
       `,
       [chatId, name.trim()],
     );
+  }
+
+  async findConversationById(conversationId: number): Promise<TelegramConversationRecord | null> {
+    const result = await pool.query<ConversationIdentityRow>(
+      `
+        SELECT
+          a.atendimento_id,
+          abs(hashtext(a.atendimento_id::text)) AS numeric_id,
+          a.whatsapp_chat_id AS chat_id,
+          c.nome AS cliente
+        FROM atendimentos a
+        LEFT JOIN clientes c ON c.cliente_id = a.cliente_id
+        WHERE abs(hashtext(a.atendimento_id::text)) = $1
+          AND a.canal = 'TELEGRAM'
+        LIMIT 1
+      `,
+      [conversationId],
+    );
+
+    const row = result.rows[0];
+    if (!row?.chat_id) {
+      return null;
+    }
+
+    return {
+      atendimentoId: Number(row.numeric_id),
+      chatId: row.chat_id,
+      cliente: row.cliente ?? "Cliente Telegram",
+    };
   }
 
   private async ensureConversation(

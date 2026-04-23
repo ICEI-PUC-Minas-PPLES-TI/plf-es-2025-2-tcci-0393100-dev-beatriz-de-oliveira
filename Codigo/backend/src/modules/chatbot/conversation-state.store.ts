@@ -20,6 +20,7 @@ export class ConversationStateStore {
       lastMessageAt: nowIso(),
       handoffRequested: false,
       awaitingHumanHandoffDecision: false,
+      awaitingProductSelectionForInterest: false,
       lastShownProducts: [],
       lastSuggestedCategories: [],
     };
@@ -38,6 +39,7 @@ export class ConversationStateStore {
           | "stage"
           | "handoffRequested"
           | "awaitingHumanHandoffDecision"
+          | "awaitingProductSelectionForInterest"
           | "lastShownProducts"
           | "lastSuggestedCategories"
           | "selectedProductName"
@@ -66,6 +68,7 @@ export class ConversationStateStore {
       stage: "ENCAMINHADO_HUMANO",
       handoffRequested: true,
       awaitingHumanHandoffDecision: false,
+      awaitingProductSelectionForInterest: false,
       lastShownProducts: [],
       lastSuggestedCategories: [],
       selectedCategoryName: undefined,
@@ -84,6 +87,7 @@ export class ConversationStateStore {
       stage: "IDLE",
       handoffRequested: false,
       awaitingHumanHandoffDecision: false,
+      awaitingProductSelectionForInterest: false,
       lastShownProducts: [],
       lastSuggestedCategories: [],
       selectedProductName: undefined,
