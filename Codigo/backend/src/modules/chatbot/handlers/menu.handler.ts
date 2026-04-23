@@ -1,33 +1,33 @@
-﻿import type { ChatbotContext, ChatbotResponse, IntentHandler } from "../types.js";
-import { buildMainMenuText } from "./shared.js";
+import type { ChatbotContext, ChatbotResponse, IntentHandler } from "../types.js";
 import { pickVariant } from "../response-variants.js";
+import { buildMainMenuKeyboard, buildMainMenuText } from "./shared.js";
 
 export class MenuHandler implements IntentHandler {
   intent = "menu" as const;
 
   async handle(context: ChatbotContext): Promise<ChatbotResponse> {
     const intro = pickVariant(context, "menu", [
-      "Claro, vou te mostrar as opções novamente.",
-      "Perfeito, aqui está o menu principal para continuarmos.",
-      "Sem problema. Vou reorganizar as opções para você.",
+      "Vamos seguir por aqui.",
+      "Separei as opções principais para você.",
+      "Tudo certo. Escolha como quer continuar.",
     ]);
 
     return {
       intent: this.intent,
       handler: "MenuHandler",
-      replyText: [
-        intro,
-        "",
-        buildMainMenuText(),
-        "",
-        "Próximo passo: responda com 1, 2 ou 3 para eu seguir com você.",
-      ].join("\n"),
+      replyText: `${intro}\n${buildMainMenuText()}`,
+      replyMessages: [`${intro}\n${buildMainMenuText()}`],
       actions: ["show_menu"],
       handoffRequested: false,
+      telegram: {
+        inlineKeyboard: buildMainMenuKeyboard(),
+      },
       stateTransition: {
         stage: "MENU_PRINCIPAL",
         awaitingHumanHandoffDecision: false,
         lastShownProducts: [],
+        lastSuggestedCategories: [],
+        selectedCategoryName: undefined,
       },
     };
   }

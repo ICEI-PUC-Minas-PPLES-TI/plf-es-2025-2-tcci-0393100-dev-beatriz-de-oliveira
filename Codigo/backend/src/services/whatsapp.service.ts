@@ -217,24 +217,28 @@ export class WhatsAppService {
       }
 
       try {
-        const delivery = await this.sendMessage(messageResult.phone, messageResult.response.replyText, {
-          throwOnMissingConfig: false,
-        });
+        const outboundMessages = messageResult.response.replyMessages?.filter((message) => message.trim()) ?? [messageResult.response.replyText];
 
-        const savedMessage = await this.repository.saveOutgoingMessage({
-          phone: messageResult.phone,
-          text: messageResult.response.replyText,
-          messageId: delivery.messageId,
-          statusEntrega: delivery.status,
-          handoffRequested,
-          intent: messageResult.response.intent,
-          stage,
-        });
-        const conversationId =
-          savedMessage.conversationId
-          ?? (await this.repository.getConversationAutomationStateByPhone(messageResult.phone))?.atendimentoId;
-        if (conversationId) {
-          await this.leadStatusService.updateLeadStatusFromConversation(conversationId);
+        for (const outboundText of outboundMessages) {
+          const delivery = await this.sendMessage(messageResult.phone, outboundText, {
+            throwOnMissingConfig: false,
+          });
+
+          const savedMessage = await this.repository.saveOutgoingMessage({
+            phone: messageResult.phone,
+            text: outboundText,
+            messageId: delivery.messageId,
+            statusEntrega: delivery.status,
+            handoffRequested,
+            intent: messageResult.response.intent,
+            stage,
+          });
+          const conversationId =
+            savedMessage.conversationId
+            ?? (await this.repository.getConversationAutomationStateByPhone(messageResult.phone))?.atendimentoId;
+          if (conversationId) {
+            await this.leadStatusService.updateLeadStatusFromConversation(conversationId);
+          }
         }
       } catch (error) {
         console.warn("[WhatsAppService] outbound_send_failed", {
@@ -242,9 +246,10 @@ export class WhatsAppService {
           error: error instanceof Error ? error.message : "unknown_error",
         });
 
+        const failedText = messageResult.response.replyMessages?.join("\n\n") ?? messageResult.response.replyText;
         const savedMessage = await this.repository.saveOutgoingMessage({
           phone: messageResult.phone,
-          text: messageResult.response.replyText,
+          text: failedText,
           statusEntrega: "FALHA",
           handoffRequested,
           intent: messageResult.response.intent,

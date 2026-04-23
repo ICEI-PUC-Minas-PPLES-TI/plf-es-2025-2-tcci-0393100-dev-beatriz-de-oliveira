@@ -22,15 +22,6 @@ function toCurrency(value: string): string {
   return parsed.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-function buildCaption(product: Produto): string {
-  const parts = [product.nome, toCurrency(product.preco)];
-  if (product.descricao?.trim()) {
-    parts.push(product.descricao.trim().slice(0, 120));
-  }
-  parts.push("Quer mais detalhes ou ver outras opções?");
-  return parts.join("\n");
-}
-
 function extractResidualText(replyText: string): string | undefined {
   const cleaned = replyText
     .split("\n")
@@ -71,7 +62,7 @@ export function buildTelegramPhotoCaption(card: TelegramProductCard): string {
   if (card.description) {
     parts.push(card.description);
   }
-  parts.push("Quer mais detalhes ou ver outras opções?");
+  parts.push("Quer seguir com este produto?");
   return parts.join("\n");
 }
 

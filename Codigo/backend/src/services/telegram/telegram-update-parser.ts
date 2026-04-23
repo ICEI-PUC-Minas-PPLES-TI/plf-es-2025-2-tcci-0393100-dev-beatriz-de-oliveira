@@ -2,7 +2,23 @@ import type { WhatsAppIncomingMessage } from "../../modules/chatbot/types.js";
 
 export type TelegramWebhookPayload = {
   update_id?: number;
-  callback_query?: Record<string, unknown>;
+  callback_query?: {
+    id: string;
+    data?: string;
+    from?: {
+      first_name?: string;
+      last_name?: string;
+      username?: string;
+    };
+    message?: {
+      message_id: number;
+      date?: number;
+      chat?: {
+        id?: number | string;
+        type?: string;
+      };
+    };
+  };
   edited_message?: Record<string, unknown>;
   message?: {
     message_id: number;
@@ -23,7 +39,7 @@ export type TelegramWebhookPayload = {
 };
 
 export type TelegramParseResult =
-  | { kind: "message"; message: WhatsAppIncomingMessage }
+  | { kind: "message"; message: WhatsAppIncomingMessage; callbackQueryId?: string }
   | { kind: "ignored"; reason: string }
   | { kind: "invalid"; reason: string };
 
@@ -36,8 +52,7 @@ function getUpdateKind(payload: TelegramWebhookPayload): string {
   return "unsupported_update";
 }
 
-function buildProfileName(payload: TelegramWebhookPayload): string | undefined {
-  const from = payload.message?.from;
+function buildProfileName(from?: { first_name?: string; last_name?: string; username?: string }): string | undefined {
   if (!from) {
     return undefined;
   }
@@ -48,6 +63,36 @@ function buildProfileName(payload: TelegramWebhookPayload): string | undefined {
   }
 
   return from.username?.trim() || undefined;
+}
+
+function mapCallbackDataToText(data?: string): string | null {
+  if (!data?.trim()) {
+    return null;
+  }
+
+  if (data === "MENU:PRODUCTS") return "produtos";
+  if (data === "MENU:PROMOTIONS") return "promocoes";
+  if (data === "MENU:HUMAN_HANDOFF") return "falar com vendedor";
+  if (data === "HANDOFF:YES") return "sim";
+  if (data === "HANDOFF:NO") return "nao";
+
+  if (data.startsWith("CATEGORY:")) {
+    return `categoria ${data.slice("CATEGORY:".length).trim()}`;
+  }
+
+  if (data.startsWith("PRODUCT:MORE:")) {
+    return `ver mais ${data.slice("PRODUCT:MORE:".length).trim()}`;
+  }
+
+  if (data.startsWith("PRODUCT:INTEREST:")) {
+    return `tenho interesse em ${data.slice("PRODUCT:INTEREST:".length).trim()}`;
+  }
+
+  if (data.startsWith("PRODUCT:SELLER:")) {
+    return `quero falar com vendedor sobre ${data.slice("PRODUCT:SELLER:".length).trim()}`;
+  }
+
+  return data;
 }
 
 export function parseTelegramUpdate(payload: TelegramWebhookPayload): TelegramParseResult {
@@ -62,11 +107,33 @@ export function parseTelegramUpdate(payload: TelegramWebhookPayload): TelegramPa
   }
 
   if (payload.callback_query) {
-    console.info("[TelegramParser] ignored", {
-      updateKind,
-      reason: "callback_query",
-    });
-    return { kind: "ignored", reason: "callback_query" };
+    const chatId = payload.callback_query.message?.chat?.id;
+    const messageId = payload.callback_query.message?.message_id;
+    const text = mapCallbackDataToText(payload.callback_query.data);
+
+    if (!chatId || !messageId) {
+      return { kind: "invalid", reason: "missing_callback_chat_or_message_id" };
+    }
+
+    if (!text) {
+      return { kind: "ignored", reason: "empty_callback_data" };
+    }
+
+    return {
+      kind: "message",
+      callbackQueryId: payload.callback_query.id,
+      message: {
+        from: String(chatId),
+        messageId: `${String(chatId)}:callback:${String(messageId)}:${payload.callback_query.id}`,
+        hasStableMessageId: true,
+        timestamp: payload.callback_query.message?.date
+          ? new Date(payload.callback_query.message.date * 1000).toISOString()
+          : undefined,
+        text,
+        profileName: buildProfileName(payload.callback_query.from),
+        raw: payload as Record<string, unknown>,
+      },
+    };
   }
 
   if (!payload.message) {
@@ -87,59 +154,31 @@ export function parseTelegramUpdate(payload: TelegramWebhookPayload): TelegramPa
   }
 
   if (payload.message.sticker) {
-    console.info("[TelegramParser] ignored", {
-      updateKind,
-      reason: "sticker",
-      chatId: String(payload.message.chat.id),
-      messageId: String(payload.message.message_id),
-    });
     return { kind: "ignored", reason: "sticker" };
   }
 
   if (payload.message.photo?.length) {
-    console.info("[TelegramParser] ignored", {
-      updateKind,
-      reason: "photo",
-      chatId: String(payload.message.chat.id),
-      messageId: String(payload.message.message_id),
-    });
     return { kind: "ignored", reason: "photo" };
   }
 
   const text = payload.message.text?.trim();
   if (!text) {
-    console.info("[TelegramParser] ignored", {
-      updateKind,
-      reason: "no_text",
-      chatId: String(payload.message.chat.id),
-      messageId: String(payload.message.message_id),
-    });
     return { kind: "ignored", reason: "no_text" };
   }
 
   const chatId = String(payload.message.chat.id);
   const telegramMessageId = String(payload.message.message_id);
-
   const dedupKey = `${chatId}:${telegramMessageId}`;
-  console.info("[TelegramParser] accepted", {
-    updateKind,
-    chatId,
-    messageId: telegramMessageId,
-    dedupKey,
-    hasText: true,
-  });
 
   return {
     kind: "message",
     message: {
       from: chatId,
-      // Telegram `message_id` is only unique inside each chat.
-      // We namespace it with `chatId` because the chatbot dedup store is global.
       messageId: dedupKey,
       hasStableMessageId: true,
       timestamp: payload.message.date ? new Date(payload.message.date * 1000).toISOString() : undefined,
       text,
-      profileName: buildProfileName(payload),
+      profileName: buildProfileName(payload.message.from),
       raw: payload as Record<string, unknown>,
     },
   };

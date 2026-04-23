@@ -12,6 +12,7 @@ export type ChatbotIntent =
 export type ConversationStage =
   | "IDLE"
   | "MENU_PRINCIPAL"
+  | "AGUARDANDO_CATEGORIA"
   | "CONSULTANDO_PRODUTOS"
   | "AGUARDANDO_ESCOLHA_PRODUTO"
   | "AGUARDANDO_NOME_CLIENTE"
@@ -46,7 +47,9 @@ export interface ChatbotConversationState {
   handoffRequested: boolean;
   awaitingHumanHandoffDecision: boolean;
   lastShownProducts: string[];
+  lastSuggestedCategories: string[];
   selectedProductName?: string;
+  selectedCategoryName?: string;
   pendingIntentAfterName?: Extract<ChatbotIntent, "lead_interest" | "human_handoff">;
   pendingInterestSummary?: string;
 }
@@ -70,10 +73,15 @@ export interface ChatbotResponse {
   intent: ChatbotIntent;
   handler: string;
   replyText: string;
+  replyMessages?: string[];
   actions: string[];
   handoffRequested: boolean;
   leadUpdate?: LeadUpsertInput;
   capturedCustomerName?: string;
+  telegram?: {
+    inlineKeyboard?: Array<Array<{ text: string; callbackData: string }>>;
+    keyboardPrompt?: string;
+  };
   stateTransition?: Partial<
     Pick<
       ChatbotConversationState,
@@ -81,7 +89,9 @@ export interface ChatbotResponse {
       | "handoffRequested"
       | "awaitingHumanHandoffDecision"
       | "lastShownProducts"
+      | "lastSuggestedCategories"
       | "selectedProductName"
+      | "selectedCategoryName"
       | "pendingIntentAfterName"
       | "pendingInterestSummary"
     >

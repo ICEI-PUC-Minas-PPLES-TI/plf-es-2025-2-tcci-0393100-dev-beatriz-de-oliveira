@@ -77,6 +77,9 @@ export class TelegramService {
     }
 
     const message = parsed.message;
+    if (parsed.callbackQueryId) {
+      await this.answerCallbackQuery(parsed.callbackQueryId);
+    }
     console.info("[TelegramService] normalized_payload", {
       chatId: message.from,
       dedupKey: message.messageId,
@@ -194,11 +197,25 @@ export class TelegramService {
       return;
     }
 
+    const replyMessages = response.replyMessages?.filter((message) => message.trim()) ?? [];
+    if (replyMessages.length > 0) {
+      for (let index = 0; index < replyMessages.length; index += 1) {
+        const isLastMessage = index === replyMessages.length - 1;
+        await this.sendTextMessage(
+          chatId,
+          replyMessages[index]!,
+          isLastMessage ? response.telegram?.inlineKeyboard : undefined,
+        );
+      }
+      return;
+    }
+
     const products = await this.findProductsForResponse(response);
     const prepared = buildTelegramPreparedResponse(response, products);
+    const inlineKeyboard = response.telegram?.inlineKeyboard;
 
     if (prepared.productCards.length === 0) {
-      await this.sendTextMessage(chatId, prepared.fallbackText ?? response.replyText);
+      await this.sendTextMessage(chatId, prepared.fallbackText ?? response.replyText, inlineKeyboard);
       console.info("[Telegram] Resposta enviada em texto", {
         chatId,
         intent: response.intent,
@@ -240,6 +257,10 @@ export class TelegramService {
         kind: "product_fallback",
       });
     }
+
+    if (inlineKeyboard?.length) {
+      await this.sendTextMessage(chatId, response.telegram?.keyboardPrompt ?? "Escolha uma opção para continuar.", inlineKeyboard);
+    }
   }
 
   private async findProductsForResponse(response: ChatbotResponse): Promise<Produto[]> {
@@ -253,7 +274,11 @@ export class TelegramService {
     return productNames.map((name) => byName.get(name)).filter((product): product is Produto => Boolean(product));
   }
 
-  private async sendTextMessage(chatId: string, text: string): Promise<void> {
+  private async sendTextMessage(
+    chatId: string,
+    text: string,
+    inlineKeyboard?: Array<Array<{ text: string; callbackData: string }>>,
+  ): Promise<void> {
     try {
       const token = this.getBotToken();
       const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
@@ -264,6 +289,7 @@ export class TelegramService {
         body: JSON.stringify({
           chat_id: chatId,
           text,
+          reply_markup: this.buildReplyMarkup(inlineKeyboard),
         }),
       });
 
@@ -309,7 +335,12 @@ export class TelegramService {
     }
   }
 
-  private async sendPhotoMessage(chatId: string, photoUrl: string, caption: string): Promise<void> {
+  private async sendPhotoMessage(
+    chatId: string,
+    photoUrl: string,
+    caption: string,
+    inlineKeyboard?: Array<Array<{ text: string; callbackData: string }>>,
+  ): Promise<void> {
     try {
       const token = this.getBotToken();
       const response = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
@@ -321,6 +352,7 @@ export class TelegramService {
           chat_id: chatId,
           photo: photoUrl,
           caption,
+          reply_markup: this.buildReplyMarkup(inlineKeyboard),
         }),
       });
 
@@ -372,5 +404,40 @@ export class TelegramService {
       throw new AppError("Telegram bot token is not configured", 503, "TELEGRAM_BOT_NOT_CONFIGURED");
     }
     return token;
+  }
+
+  private buildReplyMarkup(inlineKeyboard?: Array<Array<{ text: string; callbackData: string }>>) {
+    if (!inlineKeyboard?.length) {
+      return undefined;
+    }
+
+    return {
+      inline_keyboard: inlineKeyboard.map((row) =>
+        row.map((button) => ({
+          text: button.text,
+          callback_data: button.callbackData,
+        })),
+      ),
+    };
+  }
+
+  private async answerCallbackQuery(callbackQueryId: string): Promise<void> {
+    try {
+      const token = this.getBotToken();
+      await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          callback_query_id: callbackQueryId,
+        }),
+      });
+    } catch (error) {
+      console.warn("[Telegram] Falha ao responder callback_query", {
+        callbackQueryId,
+        ...formatErrorDetails(error),
+      });
+    }
   }
 }

@@ -8,6 +8,10 @@ export class ProductsService {
     return this.repository.findAll();
   }
 
+  searchByName(term: string): Promise<Produto[]> {
+    return this.repository.searchByName(term);
+  }
+
   create(data: Omit<Produto, "id">): Promise<Produto> {
     return this.repository.create(data);
   }

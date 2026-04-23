@@ -6,8 +6,10 @@ import { detectIntent, parseProductChoice } from "./intent-detector.js";
 import { MessageDedupStore } from "./message-dedup.store.js";
 import { MessageProcessingQueue } from "./message-processing.queue.js";
 import { normalizeIncomingMessage, normalizeMessageText } from "./message-normalizer.js";
+import { findMatchingProducts } from "./product-resolver.js";
 import { MessageRouter } from "./message-router.js";
 import { GreetingHandler } from "./handlers/greeting.handler.js";
+import { buildCommercialHandoffText, buildHandoffKeyboard, buildProductActionsKeyboard } from "./handlers/shared.js";
 import { HumanHandoffHandler } from "./handlers/human-handoff.handler.js";
 import { LeadHandler } from "./handlers/lead.handler.js";
 import { MenuHandler } from "./handlers/menu.handler.js";
@@ -155,6 +157,18 @@ function buildInterestSummary(messageText: string): string {
   return messageText.slice(0, 140) || "Interesse informado no WhatsApp";
 }
 
+function resolveProductNameFromText(normalizedText: string, productNames: string[]): string | undefined {
+  return productNames.find((productName) => normalizedText.includes(normalizeMessageText(productName)));
+}
+
+function toCurrency(value: string): string {
+  const parsed = Number.parseFloat(value);
+  if (!Number.isFinite(parsed)) {
+    return value;
+  }
+  return parsed.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
 function hasMeaningfulCustomerName(name?: string | null): boolean {
   if (!name) {
     return false;
@@ -227,6 +241,7 @@ export class ChatbotCoreService {
       logger?: LoggerLike;
     },
   ) {
+    this.productsService = dependencies.productsService;
     this.leadsService = dependencies.leadsService;
     this.logger = dependencies.logger ?? createDefaultLogger();
     this.router = new MessageRouter([
@@ -242,6 +257,7 @@ export class ChatbotCoreService {
 
   private readonly logger: LoggerLike;
   private readonly leadsService: LeadsService;
+  private readonly productsService: ProductsService;
 
   pauseConversation(phoneNumber: string): void {
     this.stateStore.pauseForHuman(phoneNumber);
@@ -257,7 +273,7 @@ export class ChatbotCoreService {
     }
     const choiceIndex = parseProductChoice(normalizedText, productNames.length);
     if (choiceIndex === null) {
-      return undefined;
+      return resolveProductNameFromText(normalizedText, productNames);
     }
     return productNames[choiceIndex];
   }
@@ -287,7 +303,8 @@ export class ChatbotCoreService {
     return {
       intent: detectedIntent,
       handler: "CustomerNameCapturePrompt",
-      replyText: "Perfeito! Antes de continuar, posso registrar seu primeiro nome para facilitar o atendimento?",
+      replyText: "Antes de continuar, me diga seu primeiro nome.\nIsso ajuda a agilizar o atendimento.",
+      replyMessages: ["Antes de continuar, me diga seu primeiro nome.\nIsso ajuda a agilizar o atendimento."],
       actions: ["ask_customer_name"],
       handoffRequested: false,
       stateTransition: {
@@ -310,8 +327,8 @@ export class ChatbotCoreService {
       return {
         intent: state.pendingIntentAfterName ?? "lead_interest",
         handler: "CustomerNameCaptureValidation",
-        replyText:
-          "Não consegui identificar seu nome por essa mensagem. Se puder, me diga apenas seu primeiro nome para eu continuar o atendimento.",
+        replyText: "Não consegui identificar seu nome.\nMe envie só o primeiro nome para continuar.",
+        replyMessages: ["Não consegui identificar seu nome.\nMe envie só o primeiro nome para continuar."],
         actions: ["retry_customer_name"],
         handoffRequested: false,
         stateTransition: {
@@ -338,12 +355,8 @@ export class ChatbotCoreService {
       return {
         intent: "human_handoff",
         handler: "CustomerNameCaptureResumeHumanHandoff",
-        replyText: [
-          `Perfeito, ${capturedName}! Vou encaminhar você para um vendedor.`,
-          "Em instantes, alguém da equipe vai continuar o atendimento por aqui.",
-          "Enquanto isso, o bot vai pausar as respostas automáticas para não atrapalhar a conversa.",
-          "Próximo passo: aguarde a resposta do vendedor nesta mesma conversa.",
-        ].join("\n"),
+        replyText: `${capturedName}, tudo certo.\nVou te encaminhar para um vendedor agora.`,
+        replyMessages: [`${capturedName}, tudo certo.\nVou te encaminhar para um vendedor agora.`],
         actions: ["customer_name_captured", "lead_upserted", "human_handoff_requested", "pause_chatbot"],
         handoffRequested: true,
         capturedCustomerName: capturedName,
@@ -352,6 +365,8 @@ export class ChatbotCoreService {
           handoffRequested: true,
           awaitingHumanHandoffDecision: false,
           lastShownProducts: [],
+          lastSuggestedCategories: [],
+          selectedCategoryName: undefined,
           pendingIntentAfterName: undefined,
           pendingInterestSummary: undefined,
         },
@@ -370,22 +385,125 @@ export class ChatbotCoreService {
     return {
       intent: "lead_interest",
       handler: "CustomerNameCaptureResumeLeadInterest",
-      replyText: [
-        `Obrigada, ${capturedName}! Vou continuar seu atendimento por aqui.`,
-        "Já deixei seu interesse registrado para acompanhamento.",
-        "Próximo passo: responda 'sim' se quiser falar com um vendedor agora ou 'não' para voltar ao menu.",
-      ].join("\n"),
+      replyText: `${capturedName}, interesse registrado.\n${buildCommercialHandoffText()}`,
+      replyMessages: [`${capturedName}, interesse registrado.`, buildCommercialHandoffText()],
       actions: ["customer_name_captured", "lead_upserted", "ask_human_handoff_confirmation"],
       handoffRequested: false,
       capturedCustomerName: capturedName,
+      telegram: {
+        inlineKeyboard: [
+          [
+            { text: "Sim", callbackData: "HANDOFF:YES" },
+            { text: "Não", callbackData: "HANDOFF:NO" },
+          ],
+        ],
+      },
       stateTransition: {
         stage: "CONSULTANDO_PRODUTOS",
         awaitingHumanHandoffDecision: true,
         selectedProductName: state.selectedProductName,
+        selectedCategoryName: state.selectedCategoryName,
         pendingIntentAfterName: undefined,
         pendingInterestSummary: undefined,
       },
     };
+  }
+
+  private buildProductOverrideResponse(
+    products: Array<{ nome: string; preco: string; descricao: string }>,
+  ): ChatbotResponse {
+    if (products.length === 1) {
+      const product = products[0]!;
+      return {
+        intent: "products",
+        handler: "ProductSearchOverrideHandler",
+        replyText: [
+          "Encontrei este produto.",
+            `📺 ${product.nome}\n💰 ${toCurrency(product.preco)}\n${product.descricao.trim().slice(0, 120) || "Sem descrição no momento."}`,
+            buildCommercialHandoffText(),
+          ].join("\n\n"),
+          replyMessages: [
+            "Encontrei este produto 👇",
+            `📺 ${product.nome}\n💰 ${toCurrency(product.preco)}\n${product.descricao.trim().slice(0, 120) || "Sem descrição no momento."}`,
+          ],
+        actions: ["product_search_override", "product_found", "ask_human_handoff_confirmation"],
+        handoffRequested: false,
+        telegram: {
+          inlineKeyboard: buildHandoffKeyboard(),
+        },
+        stateTransition: {
+          stage: "CONSULTANDO_PRODUTOS",
+          awaitingHumanHandoffDecision: true,
+          lastShownProducts: [product.nome],
+          selectedProductName: product.nome,
+        },
+      };
+    }
+
+    return {
+      intent: "products",
+      handler: "ProductSearchOverrideHandler",
+      replyText: [
+        "Encontrei algumas opções.",
+        products
+          .slice(0, 3)
+          .map((product, index) => `${index + 1}) 📺 ${product.nome}\n💰 ${toCurrency(product.preco)}`)
+          .join("\n\n"),
+      ].join("\n\n"),
+      replyMessages: [
+        "Encontrei algumas opções 👇",
+        products
+          .slice(0, 3)
+          .map((product, index) => `${index + 1}) 📺 ${product.nome}\n💰 ${toCurrency(product.preco)}`)
+          .join("\n\n"),
+      ],
+      actions: ["product_search_override", "product_list_found", "await_product_choice"],
+      handoffRequested: false,
+      telegram: {
+        inlineKeyboard: buildProductActionsKeyboard(products[0]!.nome),
+        keyboardPrompt: "Escolha uma ação para continuar.",
+      },
+      stateTransition: {
+        stage: "AGUARDANDO_ESCOLHA_PRODUTO",
+        awaitingHumanHandoffDecision: false,
+        lastShownProducts: products.slice(0, 3).map((product) => product.nome),
+        selectedProductName: products[0]!.nome,
+      },
+    };
+  }
+
+  private async tryProductSearchOverride(context: ChatbotContext): Promise<ChatbotResponse | null> {
+    const productSearch = await findMatchingProducts(
+      context.message.originalText,
+      (term) => this.productsService.searchByName(term),
+      () => this.productsService.list(),
+    );
+    this.logger.info(
+      {
+        event: "product_search_attempt",
+        phone: context.message.from,
+        searchedProduct: productSearch.searchedProduct,
+        resultsFound: productSearch.products.length,
+      },
+      "[ChatbotProduct]",
+    );
+
+    if (productSearch.products.length === 0) {
+      return null;
+    }
+
+    this.logger.info(
+      {
+        event: "product_search_override",
+        phone: context.message.from,
+        searchedProduct: productSearch.searchedProduct,
+        resultsFound: productSearch.products.map((product) => product.nome),
+        previousStage: context.state.stage,
+      },
+      "[ChatbotProduct]",
+    );
+
+    return this.buildProductOverrideResponse(productSearch.products);
   }
 
   private async processSingleMessage(
@@ -467,10 +585,29 @@ export class ChatbotCoreService {
       };
 
       let response: ChatbotResponse;
-      if (state.stage === "AGUARDANDO_NOME_CLIENTE") {
+      const detectedIntent = detectIntent(normalized.normalizedText, state);
+      const canOverrideWithProduct =
+        detectedIntent !== "lead_interest"
+        && detectedIntent !== "human_handoff"
+        && detectedIntent !== "promotions"
+        && detectedIntent !== "menu"
+        && detectedIntent !== "greeting";
+
+      if (canOverrideWithProduct) {
+        const overrideResponse = await this.tryProductSearchOverride(context);
+        if (overrideResponse) {
+          response = overrideResponse;
+        } else {
+          if (state.stage === "AGUARDANDO_NOME_CLIENTE") {
+            response = await this.continueAfterCustomerName(context, state, nowIso);
+          } else {
+            const namePrompt = await this.requestCustomerNameIfNeeded(context, detectedIntent);
+            response = namePrompt ?? (await this.router.route(context));
+          }
+        }
+      } else if (state.stage === "AGUARDANDO_NOME_CLIENTE") {
         response = await this.continueAfterCustomerName(context, state, nowIso);
       } else {
-        const detectedIntent = detectIntent(normalized.normalizedText, state);
         const namePrompt = await this.requestCustomerNameIfNeeded(context, detectedIntent);
         response = namePrompt ?? (await this.router.route(context));
       }
@@ -478,6 +615,7 @@ export class ChatbotCoreService {
       const mergedPatch = {
         ...response.stateTransition,
         selectedProductName: response.stateTransition?.selectedProductName ?? selectedProductName ?? state.selectedProductName,
+        selectedCategoryName: response.stateTransition?.selectedCategoryName ?? state.selectedCategoryName,
       };
       const nextState = this.stateStore.update(normalized.from, {
         intent: response.intent,

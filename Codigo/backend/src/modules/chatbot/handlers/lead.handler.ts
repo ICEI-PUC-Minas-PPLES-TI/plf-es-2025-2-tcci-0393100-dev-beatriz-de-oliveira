@@ -1,5 +1,6 @@
-﻿import type { LeadsService } from "../../../services/leads.service.js";
+import type { LeadsService } from "../../../services/leads.service.js";
 import type { ChatbotContext, ChatbotResponse, IntentHandler, LeadUpsertInput } from "../types.js";
+import { buildCommercialHandoffText, buildHandoffKeyboard } from "./shared.js";
 
 function buildInterestSummary(messageText: string): string {
   return messageText.slice(0, 140) || "Interesse informado no WhatsApp";
@@ -26,24 +27,25 @@ export class LeadHandler implements IntentHandler {
     await this.leadsService.upsertByPhone(leadUpdate);
 
     const confirmation = context.selectedProductName
-      ? `Perfeito, entendi que você tem interesse no produto ${context.selectedProductName}.`
-      : "Perfeito, registrei o seu interesse para continuarmos o atendimento.";
+      ? `Interesse registrado em ${context.selectedProductName}.`
+      : "Interesse registrado com sucesso.";
 
     return {
       intent: this.intent,
       handler: "LeadHandler",
-      replyText: [
-        confirmation,
-        "Já deixei esse interesse registrado para acompanhamento.",
-        "Próximo passo: responda 'sim' se quiser falar com um vendedor agora ou 'não' para voltar ao menu.",
-      ].join("\n"),
+      replyText: `${confirmation}\n${buildCommercialHandoffText()}`,
+      replyMessages: [confirmation, buildCommercialHandoffText()],
       actions: ["lead_upserted", "ask_human_handoff_confirmation"],
       handoffRequested: false,
       leadUpdate,
+      telegram: {
+        inlineKeyboard: buildHandoffKeyboard(),
+      },
       stateTransition: {
         stage: "CONSULTANDO_PRODUTOS",
         awaitingHumanHandoffDecision: true,
         selectedProductName: context.selectedProductName,
+        selectedCategoryName: context.state.selectedCategoryName,
       },
     };
   }

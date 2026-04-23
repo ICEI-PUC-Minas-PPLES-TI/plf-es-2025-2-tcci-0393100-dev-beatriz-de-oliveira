@@ -46,6 +46,24 @@ export class PostgresProductsRepository implements ProductsRepository {
     return row ? this.mapRowToDomain(row, columns) : null;
   }
 
+  async searchByName(term: string): Promise<Produto[]> {
+    const columns = await this.getOptionalColumns();
+    const query = `
+      SELECT ${this.buildSelectColumns(columns)}
+      FROM produtos
+      WHERE nome ILIKE $1
+      ORDER BY
+        CASE WHEN nome ILIKE $2 THEN 0 ELSE 1 END,
+        produto_id ASC
+      LIMIT 5
+    `;
+
+    const partialTerm = `%${term.trim()}%`;
+    const startsWithTerm = `${term.trim()}%`;
+    const result = await pool.query<ProductRow>(query, [partialTerm, startsWithTerm]);
+    return result.rows.map((row) => this.mapRowToDomain(row, columns));
+  }
+
   async create(data: Omit<Produto, "id">): Promise<Produto> {
     const columns = await this.getOptionalColumns();
     const payload = this.mapDomainToPersistence(data, columns);

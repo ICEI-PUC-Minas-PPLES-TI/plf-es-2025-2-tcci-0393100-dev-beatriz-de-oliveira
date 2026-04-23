@@ -21,6 +21,7 @@ export class ConversationStateStore {
       handoffRequested: false,
       awaitingHumanHandoffDecision: false,
       lastShownProducts: [],
+      lastSuggestedCategories: [],
     };
     this.states.set(phoneNumber, initial);
     return initial;
@@ -38,7 +39,9 @@ export class ConversationStateStore {
           | "handoffRequested"
           | "awaitingHumanHandoffDecision"
           | "lastShownProducts"
+          | "lastSuggestedCategories"
           | "selectedProductName"
+          | "selectedCategoryName"
           | "pendingIntentAfterName"
           | "pendingInterestSummary"
         >
@@ -64,6 +67,8 @@ export class ConversationStateStore {
       handoffRequested: true,
       awaitingHumanHandoffDecision: false,
       lastShownProducts: [],
+      lastSuggestedCategories: [],
+      selectedCategoryName: undefined,
       pendingIntentAfterName: undefined,
       pendingInterestSummary: undefined,
       lastMessageAt: now,
@@ -80,7 +85,9 @@ export class ConversationStateStore {
       handoffRequested: false,
       awaitingHumanHandoffDecision: false,
       lastShownProducts: [],
+      lastSuggestedCategories: [],
       selectedProductName: undefined,
+      selectedCategoryName: undefined,
       pendingIntentAfterName: undefined,
       pendingInterestSummary: undefined,
       lastMessageAt: now,
