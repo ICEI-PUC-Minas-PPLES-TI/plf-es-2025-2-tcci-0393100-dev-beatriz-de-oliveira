@@ -203,10 +203,28 @@ export class TelegramService {
       throw new AppError("Telegram chat id is required", 400, "TELEGRAM_CHAT_ID_REQUIRED");
     }
 
-    return this.sendTextMessage(chatId, input.texto, undefined, "ATENDENTE");
+    return this.sendTextMessage(chatId, input.texto, undefined, {
+      sender: "ATENDENTE",
+      status: "PENDENTE",
+      handoffRequested: true,
+      intent: "human_handoff",
+      stage: "ENCAMINHADO_HUMANO",
+    });
+  }
+
+  private buildDeliveryState(response: ChatbotResponse) {
+    return {
+      sender: "CHATBOT" as const,
+      status: response.handoffRequested ? "PENDENTE" as const : "ATIVO" as const,
+      handoffRequested: response.handoffRequested,
+      intent: response.intent,
+      stage: response.stateTransition?.stage,
+    };
   }
 
   private async sendChatbotResponse(chatId: string, response: ChatbotResponse): Promise<void> {
+    const deliveryState = this.buildDeliveryState(response);
+
     if (!response.replyText?.trim()) {
       console.warn("[Telegram] Resposta vazia do chatbot", {
         chatId,
@@ -223,6 +241,7 @@ export class TelegramService {
           chatId,
           replyMessages[index]!,
           isLastMessage ? response.telegram?.inlineKeyboard : undefined,
+          deliveryState,
         );
       }
       return;
@@ -233,7 +252,7 @@ export class TelegramService {
     const inlineKeyboard = response.telegram?.inlineKeyboard;
 
     if (prepared.productCards.length === 0) {
-      await this.sendTextMessage(chatId, prepared.fallbackText ?? response.replyText, inlineKeyboard);
+      await this.sendTextMessage(chatId, prepared.fallbackText ?? response.replyText, inlineKeyboard, deliveryState);
       console.info("[Telegram] Resposta enviada em texto", {
         chatId,
         intent: response.intent,
@@ -242,7 +261,7 @@ export class TelegramService {
     }
 
     if (prepared.introText) {
-      await this.sendTextMessage(chatId, prepared.introText);
+      await this.sendTextMessage(chatId, prepared.introText, undefined, deliveryState);
       console.info("[Telegram] Resposta enviada em texto", {
         chatId,
         intent: response.intent,
@@ -253,7 +272,7 @@ export class TelegramService {
     for (const card of prepared.productCards) {
       if (card.imageUrl) {
         try {
-          await this.sendPhotoMessage(chatId, card.imageUrl, buildTelegramPhotoCaption(card));
+          await this.sendPhotoMessage(chatId, card.imageUrl, buildTelegramPhotoCaption(card), undefined, deliveryState);
           console.info("[Telegram] Resposta enviada com imagem", {
             chatId,
             product: card.name,
@@ -268,7 +287,7 @@ export class TelegramService {
         }
       }
 
-      await this.sendTextMessage(chatId, buildTelegramTextCard(card));
+      await this.sendTextMessage(chatId, buildTelegramTextCard(card), undefined, deliveryState);
       console.info("[Telegram] Resposta enviada em texto", {
         chatId,
         product: card.name,
@@ -277,7 +296,7 @@ export class TelegramService {
     }
 
     if (inlineKeyboard?.length) {
-      await this.sendTextMessage(chatId, response.telegram?.keyboardPrompt ?? "Escolha uma opção para continuar.", inlineKeyboard);
+      await this.sendTextMessage(chatId, response.telegram?.keyboardPrompt ?? "Escolha uma opção para continuar.", inlineKeyboard, deliveryState);
     }
   }
 
@@ -296,7 +315,13 @@ export class TelegramService {
     chatId: string,
     text: string,
     inlineKeyboard?: Array<Array<{ text: string; callbackData: string }>>,
-    sender: "CHATBOT" | "ATENDENTE" = "CHATBOT",
+    options?: {
+      sender?: "CHATBOT" | "ATENDENTE";
+      status?: "ATIVO" | "PENDENTE" | "ENCERRADO";
+      handoffRequested?: boolean;
+      intent?: string;
+      stage?: string;
+    },
   ): Promise<Mensagem> {
     try {
       const token = this.getBotToken();
@@ -322,7 +347,11 @@ export class TelegramService {
         text,
         type: "text",
         statusEntrega: "ENVIADA",
-        sender,
+        sender: options?.sender ?? "CHATBOT",
+        status: options?.status,
+        handoffRequested: options?.handoffRequested,
+        intent: options?.intent,
+        stage: options?.stage,
       });
       console.info("[TelegramService] outbound_persisted", {
         chatId,
@@ -341,7 +370,11 @@ export class TelegramService {
         text,
         type: "text",
         statusEntrega: "FALHA",
-        sender,
+        sender: options?.sender ?? "CHATBOT",
+        status: options?.status,
+        handoffRequested: options?.handoffRequested,
+        intent: options?.intent,
+        stage: options?.stage,
       });
       console.error("[TelegramService] outbound_persist_failed_send", {
         chatId,
@@ -362,6 +395,13 @@ export class TelegramService {
     photoUrl: string,
     caption: string,
     inlineKeyboard?: Array<Array<{ text: string; callbackData: string }>>,
+    options?: {
+      sender?: "CHATBOT" | "ATENDENTE";
+      status?: "ATIVO" | "PENDENTE" | "ENCERRADO";
+      handoffRequested?: boolean;
+      intent?: string;
+      stage?: string;
+    },
   ): Promise<void> {
     try {
       const token = this.getBotToken();
@@ -388,6 +428,11 @@ export class TelegramService {
         text: caption,
         type: "image",
         statusEntrega: "ENVIADA",
+        sender: options?.sender ?? "CHATBOT",
+        status: options?.status,
+        handoffRequested: options?.handoffRequested,
+        intent: options?.intent,
+        stage: options?.stage,
       });
       console.info("[TelegramService] outbound_persisted", {
         chatId,
@@ -405,6 +450,11 @@ export class TelegramService {
         text: caption,
         type: "image",
         statusEntrega: "FALHA",
+        sender: options?.sender ?? "CHATBOT",
+        status: options?.status,
+        handoffRequested: options?.handoffRequested,
+        intent: options?.intent,
+        stage: options?.stage,
       });
       console.error("[TelegramService] outbound_persist_failed_send", {
         chatId,

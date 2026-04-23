@@ -34,7 +34,12 @@ export class PostgresTelegramRepository implements TelegramRepository {
 
     try {
       await client.query("BEGIN");
-      const conversation = await this.ensureConversation(client, input.chatId, input.customerName);
+      const conversation = await this.ensureConversation(client, input.chatId, input.customerName, {
+        status: input.status ?? "ATIVO",
+        handoffRequested: input.handoffRequested,
+        intent: input.intent,
+        stage: input.stage,
+      });
 
       await client.query(
         `
@@ -64,15 +69,12 @@ export class PostgresTelegramRepository implements TelegramRepository {
         [conversation.atendimentoUuid, input.text, this.resolveTimestamp(input.timestamp), input.messageId],
       );
 
-      await client.query(
-        `
-          UPDATE atendimentos
-          SET status = 'ATIVO',
-              ultima_interacao_em = NOW()
-          WHERE atendimento_id = $1
-        `,
-        [conversation.atendimentoUuid],
-      );
+      await this.touchConversation(client, conversation.atendimentoUuid, {
+        status: input.status ?? "ATIVO",
+        handoffRequested: input.handoffRequested,
+        intent: input.intent,
+        stage: input.stage,
+      });
 
       await client.query("COMMIT");
 
@@ -94,7 +96,12 @@ export class PostgresTelegramRepository implements TelegramRepository {
 
     try {
       await client.query("BEGIN");
-      const conversation = await this.ensureConversation(client, input.chatId);
+      const conversation = await this.ensureConversation(client, input.chatId, undefined, {
+        status: input.status ?? "ATIVO",
+        handoffRequested: input.handoffRequested,
+        intent: input.intent,
+        stage: input.stage,
+      });
 
       const inserted = await client.query<MessageRow>(
         `
@@ -123,15 +130,12 @@ export class PostgresTelegramRepository implements TelegramRepository {
         [conversation.atendimentoUuid, input.text, input.sender ?? "CHATBOT", input.type, input.statusEntrega],
       );
 
-      await client.query(
-        `
-          UPDATE atendimentos
-          SET status = 'ATIVO',
-              ultima_interacao_em = NOW()
-          WHERE atendimento_id = $1
-        `,
-        [conversation.atendimentoUuid],
-      );
+      await this.touchConversation(client, conversation.atendimentoUuid, {
+        status: input.status ?? "ATIVO",
+        handoffRequested: input.handoffRequested,
+        intent: input.intent,
+        stage: input.stage,
+      });
 
       await client.query("COMMIT");
 
@@ -203,6 +207,12 @@ export class PostgresTelegramRepository implements TelegramRepository {
     client: PoolClient,
     chatId: string,
     customerName?: string,
+    options?: {
+      status?: "ATIVO" | "PENDENTE" | "ENCERRADO";
+      handoffRequested?: boolean;
+      intent?: string;
+      stage?: string;
+    },
   ): Promise<{ atendimentoUuid: string; numericId: number; chatId: string; customerName: string }> {
     const customer = await this.ensureCustomer(client, chatId, customerName);
 
@@ -229,11 +239,14 @@ export class PostgresTelegramRepository implements TelegramRepository {
         `
           UPDATE atendimentos
           SET cliente_id = $2,
-              status = 'ATIVO',
+              status = COALESCE($3, status),
+              encaminhado_humano = COALESCE($4, encaminhado_humano),
+              ultima_intencao = COALESCE($5, ultima_intencao),
+              estado_conversa = COALESCE($6, estado_conversa),
               ultima_interacao_em = NOW()
           WHERE atendimento_id = $1
         `,
-        [row.atendimento_id, customer.customerId],
+        [row.atendimento_id, customer.customerId, options?.status ?? null, options?.handoffRequested, options?.intent ?? null, options?.stage ?? null],
       );
 
       return {
@@ -253,20 +266,33 @@ export class PostgresTelegramRepository implements TelegramRepository {
           status,
           iniciado_em,
           ultima_interacao_em,
-          whatsapp_chat_id
+          whatsapp_chat_id,
+          encaminhado_humano,
+          ultima_intencao,
+          estado_conversa
         )
         VALUES (
           gen_random_uuid(),
           $1,
           'TELEGRAM',
-          'ATIVO',
+          $2,
           NOW(),
           NOW(),
-          $2
+          $3,
+          $4,
+          $5,
+          $6
         )
         RETURNING atendimento_id, abs(hashtext(atendimento_id::text)) AS numeric_id
       `,
-      [customer.customerId, chatId],
+      [
+        customer.customerId,
+        options?.status ?? "ATIVO",
+        chatId,
+        options?.handoffRequested ?? false,
+        options?.intent ?? null,
+        options?.stage ?? null,
+      ],
     );
 
     return {
@@ -335,5 +361,29 @@ export class PostgresTelegramRepository implements TelegramRepository {
 
     const parsed = new Date(timestamp);
     return Number.isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString();
+  }
+
+  private async touchConversation(
+    client: PoolClient,
+    atendimentoUuid: string,
+    options: {
+      status?: "ATIVO" | "PENDENTE" | "ENCERRADO";
+      handoffRequested?: boolean;
+      intent?: string;
+      stage?: string;
+    },
+  ): Promise<void> {
+    await client.query(
+      `
+        UPDATE atendimentos
+        SET status = COALESCE($2, status),
+            encaminhado_humano = COALESCE($3, encaminhado_humano),
+            ultima_intencao = COALESCE($4, ultima_intencao),
+            estado_conversa = COALESCE($5, estado_conversa),
+            ultima_interacao_em = NOW()
+        WHERE atendimento_id = $1
+      `,
+      [atendimentoUuid, options.status ?? null, options.handoffRequested, options.intent ?? null, options.stage ?? null],
+    );
   }
 }

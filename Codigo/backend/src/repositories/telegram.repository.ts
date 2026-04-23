@@ -13,6 +13,10 @@ export interface SaveTelegramIncomingMessageInput {
   text: string;
   messageId: string;
   timestamp?: string;
+  status?: "ATIVO" | "PENDENTE" | "ENCERRADO";
+  handoffRequested?: boolean;
+  intent?: string;
+  stage?: string;
 }
 
 export interface SaveTelegramOutgoingMessageInput {
@@ -21,6 +25,10 @@ export interface SaveTelegramOutgoingMessageInput {
   type: "text" | "image";
   statusEntrega: string;
   sender?: "CHATBOT" | "ATENDENTE";
+  status?: "ATIVO" | "PENDENTE" | "ENCERRADO";
+  handoffRequested?: boolean;
+  intent?: string;
+  stage?: string;
 }
 
 export interface TelegramRepository {
