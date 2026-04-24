@@ -8,7 +8,7 @@ export interface BillingRepository {
   createOrder(order: Omit<Pedido, "id">): Promise<Pedido>;
   updateOrder(orderId: number, data: Partial<Omit<Pedido, "id">>): Promise<Pedido | null>;
   updateOrderStatus(orderId: number, status: PedidoStatus): Promise<Pedido | null>;
-  sendManualCharge(orderId: number, message: string): Promise<Pedido>;
+  sendManualCharge(orderId: number, message: string, type?: "MANUAL" | "AUTOMATICO"): Promise<Pedido>;
   saveRoutineRun(run: Omit<BillingRoutineRun, "id">): Promise<BillingRoutineRun>;
   listRoutineRuns(): Promise<BillingRoutineRun[]>;
 }

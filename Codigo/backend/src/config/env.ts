@@ -26,7 +26,8 @@ const envSchema = z.object({
   TELEGRAM_BOT_TOKEN: z.string().optional(),
   TELEGRAM_WEBHOOK_SECRET: z.string().optional(),
   BILLING_JOB_ENABLED: z.coerce.boolean().default(true),
-  BILLING_JOB_INTERVAL_MS: z.coerce.number().int().positive().default(86400000),
+  BILLING_JOB_INTERVAL_MS: z.coerce.number().int().positive().default(60000),
+  BILLING_JOB_TIMEZONE: z.string().default("America/Sao_Paulo"),
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
 });
 

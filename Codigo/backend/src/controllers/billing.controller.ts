@@ -27,7 +27,7 @@ export async function listBillingRoutineRunsController(_request: FastifyRequest,
 
 export async function runDailyBillingRoutineController(request: FastifyRequest, reply: FastifyReply) {
   const body = parseWithSchema(billingRoutineRunBodySchema, request.body ?? {});
-  const referenceDate = body.referenceDate ? new Date(`${body.referenceDate}T00:00:00.000Z`) : new Date();
+  const referenceDate = body.referenceDate ? new Date(`${body.referenceDate}T12:00:00.000Z`) : new Date();
   const data = await container.billingService.runDailyRoutine(referenceDate);
   return reply.send({ data });
 }

@@ -240,8 +240,6 @@ export function Cobrancas() {
       return [] as ChargePreview[];
     }
 
-    const limite = parseInteger(billingRule.limite_envio_por_dia);
-    const limiteNormalizado = limite !== null && limite > 0 ? limite : Number.POSITIVE_INFINITY;
     const referenceDate = toDateOnlyIso(new Date());
 
     return pedidos
@@ -257,8 +255,7 @@ export function Cobrancas() {
           mensagem: renderChargeMessage(getTemplateForChargeKind(billingRule, tipoCobranca), pedido),
         };
       })
-      .filter((pedido): pedido is ChargePreview => pedido !== null)
-      .slice(0, limiteNormalizado);
+      .filter((pedido): pedido is ChargePreview => pedido !== null);
   }, [billingRule, pedidos]);
 
   const resetPedidoForm = () => {

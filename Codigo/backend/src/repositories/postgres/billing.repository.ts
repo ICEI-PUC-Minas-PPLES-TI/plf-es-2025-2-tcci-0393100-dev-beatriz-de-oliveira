@@ -328,7 +328,7 @@ export class PostgresBillingRepository implements BillingRepository {
     return this.updateOrder(orderId, { status });
   }
 
-  async sendManualCharge(orderId: number, message: string): Promise<Pedido> {
+  async sendManualCharge(orderId: number, message: string, type: "MANUAL" | "AUTOMATICO" = "MANUAL"): Promise<Pedido> {
     await this.ensureSupportTables();
     const current = await this.resolveOrderIdentity(orderId);
     if (!current) {
@@ -352,9 +352,9 @@ export class PostgresBillingRepository implements BillingRepository {
           data_envio,
           erro
         )
-        VALUES ($1::uuid, $2::uuid, 'MANUAL', 'ENVIADO', $3, $4, NOW(), NULL)
+        VALUES ($1::uuid, $2::uuid, $3, 'ENVIADO', $4, $5, NOW(), NULL)
       `,
-      [randomUUID(), current.pedido_uuid, channelInfo.channel.toUpperCase(), message],
+      [randomUUID(), current.pedido_uuid, type, channelInfo.channel.toUpperCase(), message],
     );
 
     const updated = await this.findOrderById(orderId);
