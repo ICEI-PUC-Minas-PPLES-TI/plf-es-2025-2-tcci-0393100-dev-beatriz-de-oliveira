@@ -23,6 +23,8 @@ type OrderRow = {
   cliente_uuid: string | null;
   cliente_nome: string | null;
   telefone_cliente: string | null;
+  telegram_chat_id: string | null;
+  latest_channel: string | null;
   numero_pedido: string | null;
   valor_total: string | number | null;
   forma_pagamento: string | null;
@@ -31,6 +33,11 @@ type OrderRow = {
   data_criacao: string | null;
   criado_em: string | null;
   atualizado_em: string | null;
+  billing_send_status: string | null;
+  billing_send_type: string | null;
+  billing_send_message: string | null;
+  billing_send_sent_at: string | null;
+  billing_send_channel: string | null;
 };
 
 type BillingRunRow = {
@@ -45,6 +52,8 @@ type BillingRunRow = {
   itens: BillingRoutineEntry[] | string | null;
 };
 
+type SendChannel = "whatsapp" | "telegram";
+
 type RuleConfig = {
   nome: string;
   tipo: string;
@@ -56,10 +65,16 @@ const PEDIDO_ID_SQL = "abs(hashtext(p.pedido_id::text))";
 const RUN_ID_SQL = "abs(hashtext(run_id::text))";
 const DEFAULT_RULE: BillingRule = {
   ativa: true,
-  mensagem_template: "Ola {nome}, seu pedido no valor de {valor} venceu em {data}.",
   limite_envio_por_dia: "10",
   hora_envio: "09:00",
-  dias_atraso_min: "1",
+  lembrete_antes_ativo: true,
+  dias_antes_vencimento: "2",
+  template_antes_vencimento: "Ola {nome}, seu pedido no valor de {valor} vence em {data}.",
+  vencimento_hoje_ativo: true,
+  template_vencimento_hoje: "Ola {nome}, passando para lembrar que seu pedido no valor de {valor} vence hoje.",
+  apos_vencimento_ativo: true,
+  dias_apos_vencimento: "1",
+  template_apos_vencimento: "Ola {nome}, identificamos que seu pedido no valor de {valor} venceu em {data}. Podemos te ajudar com a regularizacao?",
   dias_atraso_max: "30",
 };
 
@@ -98,10 +113,16 @@ export class PostgresBillingRepository implements BillingRepository {
 
     return {
       ativa: isActive,
-      mensagem_template: byType.get("MESSAGE_TEMPLATE")?.valor ?? DEFAULT_RULE.mensagem_template,
       limite_envio_por_dia: byType.get("DAILY_LIMIT")?.valor ?? DEFAULT_RULE.limite_envio_por_dia,
       hora_envio: byType.get("SEND_TIME")?.valor ?? DEFAULT_RULE.hora_envio,
-      dias_atraso_min: byType.get("MIN_DELAY_DAYS")?.valor ?? byType.get("REMINDER_DAYS")?.valor ?? DEFAULT_RULE.dias_atraso_min,
+      lembrete_antes_ativo: this.readBooleanConfig(byType, "BEFORE_ENABLED", DEFAULT_RULE.lembrete_antes_ativo),
+      dias_antes_vencimento: byType.get("BEFORE_DUE_DAYS")?.valor ?? byType.get("REMINDER_DAYS")?.valor ?? DEFAULT_RULE.dias_antes_vencimento,
+      template_antes_vencimento: byType.get("BEFORE_TEMPLATE")?.valor ?? byType.get("MESSAGE_TEMPLATE")?.valor ?? DEFAULT_RULE.template_antes_vencimento,
+      vencimento_hoje_ativo: this.readBooleanConfig(byType, "DUE_TODAY_ENABLED", DEFAULT_RULE.vencimento_hoje_ativo),
+      template_vencimento_hoje: byType.get("DUE_TODAY_TEMPLATE")?.valor ?? DEFAULT_RULE.template_vencimento_hoje,
+      apos_vencimento_ativo: this.readBooleanConfig(byType, "AFTER_ENABLED", DEFAULT_RULE.apos_vencimento_ativo),
+      dias_apos_vencimento: byType.get("AFTER_DUE_DAYS")?.valor ?? byType.get("MIN_DELAY_DAYS")?.valor ?? DEFAULT_RULE.dias_apos_vencimento,
+      template_apos_vencimento: byType.get("AFTER_TEMPLATE")?.valor ?? byType.get("MESSAGE_TEMPLATE")?.valor ?? DEFAULT_RULE.template_apos_vencimento,
       dias_atraso_max: byType.get("MAX_DELAY_DAYS")?.valor ?? DEFAULT_RULE.dias_atraso_max,
     };
   }
@@ -110,12 +131,20 @@ export class PostgresBillingRepository implements BillingRepository {
     await this.ensureSupportTables();
 
     const configs: RuleConfig[] = [
-      { nome: "Mensagem de cobranca", tipo: "MESSAGE_TEMPLATE", valor: rule.mensagem_template, ativo: rule.ativa },
       { nome: "Limite diario de envios", tipo: "DAILY_LIMIT", valor: rule.limite_envio_por_dia, ativo: rule.ativa },
       { nome: "Horario de envio", tipo: "SEND_TIME", valor: rule.hora_envio, ativo: rule.ativa },
-      { nome: "Dias minimos de atraso", tipo: "MIN_DELAY_DAYS", valor: rule.dias_atraso_min, ativo: rule.ativa },
+      { nome: "Lembrete antes do vencimento ativo", tipo: "BEFORE_ENABLED", valor: String(rule.lembrete_antes_ativo), ativo: rule.ativa && rule.lembrete_antes_ativo },
+      { nome: "Dias antes do vencimento", tipo: "BEFORE_DUE_DAYS", valor: rule.dias_antes_vencimento, ativo: rule.ativa && rule.lembrete_antes_ativo },
+      { nome: "Template antes do vencimento", tipo: "BEFORE_TEMPLATE", valor: rule.template_antes_vencimento, ativo: rule.ativa && rule.lembrete_antes_ativo },
+      { nome: "Vencimento hoje ativo", tipo: "DUE_TODAY_ENABLED", valor: String(rule.vencimento_hoje_ativo), ativo: rule.ativa && rule.vencimento_hoje_ativo },
+      { nome: "Template vencimento hoje", tipo: "DUE_TODAY_TEMPLATE", valor: rule.template_vencimento_hoje, ativo: rule.ativa && rule.vencimento_hoje_ativo },
+      { nome: "Cobranca apos vencimento ativa", tipo: "AFTER_ENABLED", valor: String(rule.apos_vencimento_ativo), ativo: rule.ativa && rule.apos_vencimento_ativo },
+      { nome: "Dias apos vencimento", tipo: "AFTER_DUE_DAYS", valor: rule.dias_apos_vencimento, ativo: rule.ativa && rule.apos_vencimento_ativo },
+      { nome: "Template apos vencimento", tipo: "AFTER_TEMPLATE", valor: rule.template_apos_vencimento, ativo: rule.ativa && rule.apos_vencimento_ativo },
       { nome: "Dias maximos de atraso", tipo: "MAX_DELAY_DAYS", valor: rule.dias_atraso_max, ativo: rule.ativa },
-      { nome: "Lembrete de atraso", tipo: "REMINDER_DAYS", valor: rule.dias_atraso_min, ativo: rule.ativa },
+      { nome: "Mensagem de cobranca legado", tipo: "MESSAGE_TEMPLATE", valor: rule.template_apos_vencimento, ativo: rule.ativa },
+      { nome: "Dias minimos de atraso legado", tipo: "MIN_DELAY_DAYS", valor: rule.dias_apos_vencimento, ativo: rule.ativa },
+      { nome: "Lembrete de atraso legado", tipo: "REMINDER_DAYS", valor: rule.dias_antes_vencimento, ativo: rule.ativa },
     ];
 
     const client = await pool.connect();
@@ -161,6 +190,13 @@ export class PostgresBillingRepository implements BillingRepository {
     await this.ensureSupportTables();
     const result = await pool.query<OrderRow>(this.buildOrdersSelectQuery());
     return result.rows.map((row) => this.mapOrderRow(row));
+  }
+
+  async findOrderById(orderId: number): Promise<Pedido | null> {
+    await this.ensureSupportTables();
+    const result = await pool.query<OrderRow>(`${this.buildOrdersSelectQuery()} WHERE ${PEDIDO_ID_SQL} = $1 LIMIT 1`, [orderId]);
+    const row = result.rows[0];
+    return row ? this.mapOrderRow(row) : null;
   }
 
   async createOrder(order: Omit<Pedido, "id">): Promise<Pedido> {
@@ -283,6 +319,42 @@ export class PostgresBillingRepository implements BillingRepository {
     return this.updateOrder(orderId, { status });
   }
 
+  async sendManualCharge(orderId: number, message: string): Promise<Pedido> {
+    await this.ensureSupportTables();
+    const current = await this.resolveOrderIdentity(orderId);
+    if (!current) {
+      throw new Error("Charge not found");
+    }
+
+    const channelInfo = this.resolveDeliveryTarget(current);
+    if (!channelInfo.available || !channelInfo.channel) {
+      throw new Error(channelInfo.reason ?? "No valid delivery channel");
+    }
+
+    await pool.query(
+      `
+        INSERT INTO billing_charge_sends (
+          send_id,
+          pedido_id,
+          tipo_envio,
+          status,
+          canal,
+          mensagem,
+          data_envio,
+          erro
+        )
+        VALUES ($1::uuid, $2::uuid, 'MANUAL', 'ENVIADO', $3, $4, NOW(), NULL)
+      `,
+      [randomUUID(), current.pedido_uuid, channelInfo.channel.toUpperCase(), message],
+    );
+
+    const updated = await this.findOrderById(orderId);
+    if (!updated) {
+      throw new Error("Charge not found");
+    }
+    return updated;
+  }
+
   async saveRoutineRun(run: Omit<BillingRoutineRun, "id">): Promise<BillingRoutineRun> {
     await this.ensureSupportTables();
     const runId = randomUUID();
@@ -342,6 +414,20 @@ export class PostgresBillingRepository implements BillingRepository {
         itens jsonb NOT NULL DEFAULT '[]'::jsonb
       )
     `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS billing_charge_sends (
+        send_id uuid PRIMARY KEY,
+        pedido_id uuid NOT NULL REFERENCES pedidos(pedido_id) ON DELETE CASCADE,
+        tipo_envio varchar(20) NOT NULL,
+        status varchar(20) NOT NULL,
+        canal varchar(20),
+        mensagem text NOT NULL,
+        data_envio timestamp without time zone NOT NULL DEFAULT NOW(),
+        erro text,
+        criado_em timestamp without time zone NOT NULL DEFAULT NOW()
+      )
+    `);
   }
 
   private buildOrdersSelectQuery(): string {
@@ -352,6 +438,8 @@ export class PostgresBillingRepository implements BillingRepository {
         p.cliente_id::text AS cliente_uuid,
         c.nome AS cliente_nome,
         COALESCE(m.telefone_cliente, c.telefone) AS telefone_cliente,
+        telegram.chat_id AS telegram_chat_id,
+        latest_attendance.canal AS latest_channel,
         m.numero_pedido,
         p.valor_total,
         p.forma_pagamento,
@@ -359,24 +447,61 @@ export class PostgresBillingRepository implements BillingRepository {
         m.data_vencimento::text AS data_vencimento,
         p.data_criacao,
         p.criado_em,
-        p.atualizado_em
+        p.atualizado_em,
+        latest_send.status AS billing_send_status,
+        latest_send.tipo_envio AS billing_send_type,
+        latest_send.mensagem AS billing_send_message,
+        latest_send.data_envio::text AS billing_send_sent_at,
+        lower(latest_send.canal) AS billing_send_channel
       FROM pedidos p
       LEFT JOIN clientes c ON c.cliente_id = p.cliente_id
       LEFT JOIN pedido_cobranca_meta m ON m.pedido_id = p.pedido_id
+      LEFT JOIN LATERAL (
+        SELECT a.whatsapp_chat_id AS chat_id
+        FROM atendimentos a
+        WHERE a.cliente_id = p.cliente_id
+          AND a.canal = 'TELEGRAM'
+          AND a.whatsapp_chat_id IS NOT NULL
+          AND btrim(a.whatsapp_chat_id) <> ''
+        ORDER BY COALESCE(a.ultima_interacao_em, a.iniciado_em) DESC NULLS LAST
+        LIMIT 1
+      ) telegram ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT lower(a.canal) AS canal
+        FROM atendimentos a
+        WHERE a.cliente_id = p.cliente_id
+        ORDER BY COALESCE(a.ultima_interacao_em, a.iniciado_em) DESC NULLS LAST
+        LIMIT 1
+      ) latest_attendance ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT bcs.status, bcs.tipo_envio, bcs.mensagem, bcs.data_envio, bcs.canal
+        FROM billing_charge_sends bcs
+        WHERE bcs.pedido_id = p.pedido_id
+        ORDER BY bcs.data_envio DESC, bcs.criado_em DESC
+        LIMIT 1
+      ) latest_send ON TRUE
     `;
   }
 
   private mapOrderRow(row: OrderRow): Pedido {
     const dueDate = row.data_vencimento ?? this.coerceDate(row.data_criacao ?? row.criado_em) ?? toDateOnlyIso(new Date());
+    const channelInfo = this.resolveDeliveryTarget(row);
     return {
       id: Number(row.numeric_id),
       numero_pedido: row.numero_pedido ?? `PED-${String(row.numeric_id).padStart(6, "0")}`,
       cliente: row.cliente_nome ?? "Cliente sem nome",
-      telefone_cliente: row.telefone_cliente ?? "",
+      telefone_cliente: channelInfo.displayTarget,
       valor_total: row.valor_total !== null ? String(row.valor_total) : "0",
       forma_pagamento: row.forma_pagamento ?? "",
       status: mapDbStatusToDomain(row.status, dueDate),
       data_vencimento: dueDate,
+      cobrancaStatus: row.billing_send_status === "ENVIADO" ? "ENVIADO" : row.billing_send_status === "FALHA" ? "FALHA" : undefined,
+      cobrancaTipoEnvio: row.billing_send_type === "MANUAL" ? "MANUAL" : row.billing_send_type === "AUTOMATICO" ? "AUTOMATICO" : undefined,
+      cobrancaDataEnvio: row.billing_send_sent_at ?? undefined,
+      cobrancaMensagem: row.billing_send_message ?? undefined,
+      cobrancaCanal: channelInfo.channel,
+      cobrancaCanalDisponivel: channelInfo.available,
+      cobrancaMotivoIndisponivel: channelInfo.reason,
     };
   }
 
@@ -402,6 +527,37 @@ export class PostgresBillingRepository implements BillingRepository {
   private async resolveOrderIdentity(orderId: number): Promise<OrderRow | null> {
     const result = await pool.query<OrderRow>(`${this.buildOrdersSelectQuery()} WHERE ${PEDIDO_ID_SQL} = $1 LIMIT 1`, [orderId]);
     return result.rows[0] ?? null;
+  }
+
+  private resolveDeliveryTarget(row: Pick<OrderRow, "telefone_cliente" | "telegram_chat_id" | "latest_channel">): {
+    available: boolean;
+    channel?: SendChannel;
+    reason?: string;
+    displayTarget: string;
+  } {
+    const phone = this.normalizePhone(row.telefone_cliente);
+    const telegramChatId = row.telegram_chat_id?.trim();
+    if (telegramChatId) {
+      return {
+        available: true,
+        channel: "telegram",
+        displayTarget: telegramChatId,
+      };
+    }
+
+    if (phone) {
+      return {
+        available: true,
+        channel: "whatsapp",
+        displayTarget: phone,
+      };
+    }
+
+    return {
+      available: false,
+      reason: "Sem canal cadastrado. Cadastre um telefone ou chat do Telegram para liberar o envio.",
+      displayTarget: "",
+    };
   }
 
   private async findOrCreateClient(client: PoolClient, nome: string, telefone: string, existingClientId?: string | null): Promise<string | null> {
@@ -443,6 +599,36 @@ export class PostgresBillingRepository implements BillingRepository {
       return null;
     }
     return new Date(value).toISOString().slice(0, 10);
+  }
+
+  private readBooleanConfig(byType: Map<string, RuleRow>, type: string, fallback: boolean): boolean {
+    const rawValue = byType.get(type)?.valor;
+    if (!rawValue) {
+      return fallback;
+    }
+
+    return rawValue.trim().toLowerCase() === "true";
+  }
+
+  private normalizePhone(value?: string | null): string | null {
+    const digits = value?.replace(/\D/g, "") ?? "";
+    if (!digits) {
+      return null;
+    }
+
+    if (digits.startsWith("55") && digits.length >= 12) {
+      return digits;
+    }
+
+    if (digits.length === 10 || digits.length === 11) {
+      return `55${digits}`;
+    }
+
+    if (digits.length >= 8) {
+      return digits;
+    }
+
+    return null;
   }
 }
 

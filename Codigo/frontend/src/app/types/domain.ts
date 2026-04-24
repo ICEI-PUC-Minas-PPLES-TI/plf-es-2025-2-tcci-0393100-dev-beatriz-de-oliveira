@@ -4,6 +4,9 @@ export type PedidoStatus = "PAGO" | "ATRASADO" | "PENDENTE" | "CANCELADO";
 export type AtendimentoStatus = "ATIVO" | "PENDENTE" | "ENCERRADO";
 export type MensagemTipo = "recebida" | "enviada";
 export type ConversationChannel = "whatsapp" | "telegram";
+export type BillingSendStatus = "ENVIADO" | "FALHA";
+export type BillingSendType = "AUTOMATICO" | "MANUAL";
+export type BillingChargeKind = "LEMBRETE" | "VENCE_HOJE" | "EM_ATRASO";
 export type DisponibilidadeStatus = "disponivel" | "indisponivel";
 
 export interface Produto {
@@ -47,14 +50,27 @@ export interface Pedido {
   forma_pagamento: string;
   status: PedidoStatus;
   data_vencimento: string;
+  cobrancaStatus?: BillingSendStatus;
+  cobrancaTipoEnvio?: BillingSendType;
+  cobrancaDataEnvio?: string;
+  cobrancaMensagem?: string;
+  cobrancaCanal?: ConversationChannel;
+  cobrancaCanalDisponivel?: boolean;
+  cobrancaMotivoIndisponivel?: string;
 }
 
 export interface BillingRule {
   ativa: boolean;
-  mensagem_template: string;
   limite_envio_por_dia: string;
   hora_envio: string;
-  dias_atraso_min: string;
+  lembrete_antes_ativo: boolean;
+  dias_antes_vencimento: string;
+  template_antes_vencimento: string;
+  vencimento_hoje_ativo: boolean;
+  template_vencimento_hoje: string;
+  apos_vencimento_ativo: boolean;
+  dias_apos_vencimento: string;
+  template_apos_vencimento: string;
   dias_atraso_max: string;
 }
 

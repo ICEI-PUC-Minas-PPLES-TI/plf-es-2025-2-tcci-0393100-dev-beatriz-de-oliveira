@@ -14,6 +14,24 @@ interface SendManualMessageInput {
   texto: string;
 }
 
+function normalizeOutgoingPhone(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+
+  if (!digits) {
+    return phone;
+  }
+
+  if (digits.startsWith("55") && digits.length >= 12) {
+    return digits;
+  }
+
+  if (digits.length === 10 || digits.length === 11) {
+    return `55${digits}`;
+  }
+
+  return digits.length >= 8 ? digits : phone;
+}
+
 type ExtractedWebhookMessage = {
   from: string;
   text: string;
@@ -333,11 +351,12 @@ export class WhatsAppService {
       throw new AppError("Phone is required to send a WhatsApp message", 400, "WHATSAPP_PHONE_REQUIRED");
     }
 
-    const delivery = await this.sendMessage(phone, input.texto, { throwOnMissingConfig: true });
+    const normalizedPhone = normalizeOutgoingPhone(phone);
+    const delivery = await this.sendMessage(normalizedPhone, input.texto, { throwOnMissingConfig: true });
 
     const savedMessage = await this.repository.saveOutgoingMessage({
       atendimentoId: input.atendimentoId,
-      phone,
+      phone: normalizedPhone,
       text: input.texto,
       messageId: delivery.messageId,
       statusEntrega: delivery.status,
@@ -356,6 +375,7 @@ export class WhatsAppService {
     text: string,
     options?: { throwOnMissingConfig?: boolean },
   ): Promise<{ messageId?: string; status: string }> {
+    const normalizedPhone = normalizeOutgoingPhone(phone);
     const token = env.WHATSAPP_META_TOKEN?.trim();
     const phoneNumberId = env.WHATSAPP_PHONE_NUMBER_ID?.trim();
 
@@ -377,7 +397,7 @@ export class WhatsAppService {
         },
         body: JSON.stringify({
           messaging_product: "whatsapp",
-          to: phone,
+          to: normalizedPhone,
           type: "text",
           text: { body: text },
         }),

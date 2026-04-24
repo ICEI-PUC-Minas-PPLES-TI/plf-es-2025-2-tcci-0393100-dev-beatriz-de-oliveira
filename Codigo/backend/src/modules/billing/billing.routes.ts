@@ -6,18 +6,38 @@ import {
   listBillingRoutineRunsController,
   runDailyBillingRoutineController,
   saveBillingRulesController,
+  sendBillingChargeController,
   updateBillingOrderController,
 } from "../../controllers/billing.controller.js";
 
 const billingRuleSchema = {
   type: "object",
-  required: ["ativa", "mensagem_template", "limite_envio_por_dia", "hora_envio", "dias_atraso_min", "dias_atraso_max"],
+  required: [
+    "ativa",
+    "limite_envio_por_dia",
+    "hora_envio",
+    "lembrete_antes_ativo",
+    "dias_antes_vencimento",
+    "template_antes_vencimento",
+    "vencimento_hoje_ativo",
+    "template_vencimento_hoje",
+    "apos_vencimento_ativo",
+    "dias_apos_vencimento",
+    "template_apos_vencimento",
+    "dias_atraso_max",
+  ],
   properties: {
     ativa: { type: "boolean" },
-    mensagem_template: { type: "string" },
     limite_envio_por_dia: { type: "string" },
     hora_envio: { type: "string" },
-    dias_atraso_min: { type: "string" },
+    lembrete_antes_ativo: { type: "boolean" },
+    dias_antes_vencimento: { type: "string" },
+    template_antes_vencimento: { type: "string" },
+    vencimento_hoje_ativo: { type: "boolean" },
+    template_vencimento_hoje: { type: "string" },
+    apos_vencimento_ativo: { type: "boolean" },
+    dias_apos_vencimento: { type: "string" },
+    template_apos_vencimento: { type: "string" },
     dias_atraso_max: { type: "string" },
   },
 };
@@ -203,6 +223,33 @@ export async function billingRoutes(fastify: FastifyInstance) {
       },
     },
     updateBillingOrderController,
+  );
+
+  fastify.post(
+    "/charges/:id/send",
+    {
+      schema: {
+        tags: ["Billing"],
+        summary: "Envia manualmente uma cobranca prevista",
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: {
+            id: { type: "number" },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              data: billingOrderSchema,
+            },
+          },
+        },
+      },
+    },
+    sendBillingChargeController,
   );
 
   fastify.get(

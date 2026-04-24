@@ -248,6 +248,25 @@ export const adminDataService = {
       async () => (await httpClient.put<ApiItemResponse<Pedido>>(`${API_ENDPOINTS.billingOrders}/${id}`, payload)).data,
     ),
 
+  sendBillingCharge: (chargeId: number) =>
+    getMockOrApiData<Pedido>(
+      () => {
+        const index = PEDIDOS.findIndex((item) => item.id === chargeId);
+        if (index < 0) {
+          throw new Error("Cobranca nao encontrada");
+        }
+        const updated: Pedido = {
+          ...PEDIDOS[index],
+          cobrancaStatus: "ENVIADO",
+          cobrancaTipoEnvio: "MANUAL",
+          cobrancaDataEnvio: new Date().toISOString(),
+        };
+        PEDIDOS[index] = updated;
+        return updated;
+      },
+      async () => (await httpClient.post<ApiItemResponse<Pedido>>(API_ENDPOINTS.billingChargeSend(chargeId))).data,
+    ),
+
   listAtendimentos: () =>
     getMockOrApiData<Atendimento[]>(
       () => ATENDIMENTOS,

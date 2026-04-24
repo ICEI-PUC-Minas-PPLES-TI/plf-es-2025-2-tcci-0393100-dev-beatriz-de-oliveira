@@ -2,10 +2,16 @@ import { z } from "zod";
 
 export const billingRuleSchema = z.object({
   ativa: z.boolean(),
-  mensagem_template: z.string().min(1),
   limite_envio_por_dia: z.string().min(1),
   hora_envio: z.string().min(1),
-  dias_atraso_min: z.string().min(1),
+  lembrete_antes_ativo: z.boolean(),
+  dias_antes_vencimento: z.string().min(1),
+  template_antes_vencimento: z.string().min(1),
+  vencimento_hoje_ativo: z.boolean(),
+  template_vencimento_hoje: z.string().min(1),
+  apos_vencimento_ativo: z.boolean(),
+  dias_apos_vencimento: z.string().min(1),
+  template_apos_vencimento: z.string().min(1),
   dias_atraso_max: z.string().min(1),
 });
 

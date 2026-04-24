@@ -36,7 +36,6 @@ const conversationsRepository = new PostgresConversationsRepository();
 const productsService = new ProductsService(productsRepository);
 const promotionsService = new PromotionsService(promotionsRepository);
 const leadsService = new LeadsService(leadsRepository);
-const billingService = new BillingService(billingRepository);
 const leadStatusService = new LeadStatusService();
 const chatbotCoreService = new ChatbotCoreService({
   productsService,
@@ -46,6 +45,7 @@ const chatbotCoreService = new ChatbotCoreService({
 const whatsappService = new WhatsAppService(chatbotCoreService, whatsappRepository, leadStatusService);
 const telegramService = new TelegramService(chatbotCoreService, productsService, telegramRepository, leadStatusService);
 const conversationsService = new ConversationsService(conversationsRepository, whatsappService, telegramService);
+const billingService = new BillingService(billingRepository, whatsappService, telegramService);
 
 export const container = {
   authService: new AuthService(authRepository),

@@ -8,6 +8,7 @@ export const API_ENDPOINTS = {
   billingRules: "/billing-rules",
   billingOrders: "/billing-rules/orders",
   billingRuns: "/billing-rules/runs",
+  billingChargeSend: (chargeId: number) => `/billing/charges/${chargeId}/send`,
   conversations: "/conversations",
   conversationMessages: (conversationId: number) => `/conversations/${conversationId}/messages`,
   conversationFullHistory: (conversationId: number) => `/conversations/${conversationId}/full-history`,

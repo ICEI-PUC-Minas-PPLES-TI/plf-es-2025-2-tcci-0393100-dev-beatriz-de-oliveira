@@ -50,3 +50,8 @@ export async function updateBillingOrderController(request: FastifyRequest, repl
   return reply.send({ data });
 }
 
+export async function sendBillingChargeController(request: FastifyRequest, reply: FastifyReply) {
+  const params = parseWithSchema(billingOrderIdParamSchema, request.params);
+  const data = await container.billingService.sendManualCharge(params.id);
+  return reply.send({ data });
+}

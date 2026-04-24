@@ -41,6 +41,7 @@ export async function registerRoutes(fastify: FastifyInstance) {
     await protectedScope.register(promotionsRoutes, { prefix: "/promotions" });
     await protectedScope.register(leadsRoutes, { prefix: "/leads" });
     await protectedScope.register(billingRoutes, { prefix: "/billing-rules" });
+    await protectedScope.register(billingRoutes, { prefix: "/billing" });
     await protectedScope.register(conversationsRoutes, { prefix: "/conversations" });
     await protectedScope.register(whatsAppInboxRoutes, { prefix: "/whatsapp" });
 

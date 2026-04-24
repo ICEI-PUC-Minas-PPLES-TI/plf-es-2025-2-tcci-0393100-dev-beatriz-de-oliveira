@@ -116,10 +116,16 @@ export function useBillingRuleData() {
   const loader = useCallback(() => adminDataService.getBillingRule(), []);
   return useAsyncData<BillingRule>(loader, {
     ativa: true,
-    mensagem_template: "",
     limite_envio_por_dia: "",
     hora_envio: "",
-    dias_atraso_min: "",
+    lembrete_antes_ativo: true,
+    dias_antes_vencimento: "",
+    template_antes_vencimento: "",
+    vencimento_hoje_ativo: true,
+    template_vencimento_hoje: "",
+    apos_vencimento_ativo: true,
+    dias_apos_vencimento: "",
+    template_apos_vencimento: "",
     dias_atraso_max: "",
   });
 }

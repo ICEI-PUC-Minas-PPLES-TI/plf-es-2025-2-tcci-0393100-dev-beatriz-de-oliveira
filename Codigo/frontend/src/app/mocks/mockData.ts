@@ -268,10 +268,16 @@ export const METRICAS: Metricas = {
 
 export const BILLING_RULE: BillingRule = {
   ativa: true,
-  mensagem_template: "Ol� {nome}, seu pedido no valor de {valor} vence em {data}.",
   limite_envio_por_dia: "10",
   hora_envio: "09:00",
-  dias_atraso_min: "1",
+  lembrete_antes_ativo: true,
+  dias_antes_vencimento: "2",
+  template_antes_vencimento: "Ol� {nome}, seu pedido no valor de {valor} vence em {data}.",
+  vencimento_hoje_ativo: true,
+  template_vencimento_hoje: "Ol� {nome}, passando para lembrar que seu pedido no valor de {valor} vence hoje.",
+  apos_vencimento_ativo: true,
+  dias_apos_vencimento: "1",
+  template_apos_vencimento: "Ol� {nome}, identificamos que seu pedido no valor de {valor} venceu em {data}. Podemos te ajudar com a regulariza��o?",
   dias_atraso_max: "30",
 };
 
