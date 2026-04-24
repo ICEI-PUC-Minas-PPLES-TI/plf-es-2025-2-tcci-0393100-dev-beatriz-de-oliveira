@@ -46,6 +46,9 @@ export interface Pedido {
   numero_pedido: string;
   cliente: string;
   telefone_cliente: string;
+  telefone?: string;
+  telegramChatId?: string;
+  contatoExibicao?: string;
   valor_total: string;
   forma_pagamento: string;
   status: PedidoStatus;

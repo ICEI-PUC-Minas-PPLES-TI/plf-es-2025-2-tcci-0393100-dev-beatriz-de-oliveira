@@ -226,6 +226,8 @@ export const adminDataService = {
         const created: Pedido = {
           id: nextId,
           ...payload,
+          telefone: payload.telefone_cliente,
+          contatoExibicao: payload.telefone_cliente,
           numero_pedido: payload.numero_pedido || `PED-${String(nextId).padStart(4, "0")}`,
         };
         PEDIDOS.push(created);
@@ -241,7 +243,12 @@ export const adminDataService = {
         if (index < 0) {
           throw new Error("Pedido nao encontrado");
         }
-        const updated: Pedido = { ...PEDIDOS[index], ...payload };
+        const updated: Pedido = {
+          ...PEDIDOS[index],
+          ...payload,
+          telefone: payload.telefone_cliente ?? PEDIDOS[index]?.telefone,
+          contatoExibicao: payload.telefone_cliente ?? PEDIDOS[index]?.contatoExibicao,
+        };
         PEDIDOS[index] = updated;
         return updated;
       },

@@ -45,6 +45,12 @@ const CHARGE_KIND_LABEL: Record<BillingChargeKind, string> = {
   EM_ATRASO: "Em atraso",
 };
 
+const formatChargeChannelLabel = (channel?: Pedido["cobrancaCanal"]) => {
+  if (channel === "telegram") return "Telegram";
+  if (channel === "whatsapp") return "WhatsApp";
+  return "Sem canal cadastrado";
+};
+
 const formatIsoDateToPtBr = (isoDate: string) => {
   const [year, month, day] = isoDate.split("-");
   if (!year || !month || !day) {
@@ -630,12 +636,12 @@ export function Cobrancas() {
                               </TableCell>
                               <TableCell className="text-sm">
                                 <div
-                                  className="capitalize text-gray-900"
+                                  className="text-gray-900"
                                   title={cobranca.cobrancaCanalDisponivel ? undefined : cobranca.cobrancaMotivoIndisponivel ?? "Sem canal cadastrado"}
                                 >
-                                  {cobranca.cobrancaCanal ?? "Sem canal cadastrado"}
+                                  {formatChargeChannelLabel(cobranca.cobrancaCanal)}
                                 </div>
-                                <div className="text-muted-foreground">{cobranca.telefone_cliente || "Sem contato"}</div>
+                                <div className="text-muted-foreground">{cobranca.contatoExibicao || "Sem contato"}</div>
                               </TableCell>
                               <TableCell className="font-medium">{cobranca.cliente}</TableCell>
                               <TableCell>{formatIsoDateToPtBr(cobranca.data_vencimento)}</TableCell>
@@ -859,8 +865,8 @@ export function Cobrancas() {
                 </div>
                 <div>
                   <p className="text-xs uppercase tracking-wide text-muted-foreground">Canal / contato</p>
-                  <p className="text-sm font-medium capitalize text-gray-900">
-                    {selectedCharge.cobrancaCanal ?? "Sem canal cadastrado"} • {selectedCharge.telefone_cliente || "Sem contato"}
+                  <p className="text-sm font-medium text-gray-900">
+                    {formatChargeChannelLabel(selectedCharge.cobrancaCanal)} • {selectedCharge.contatoExibicao || "Sem contato"}
                   </p>
                 </div>
                 <div>

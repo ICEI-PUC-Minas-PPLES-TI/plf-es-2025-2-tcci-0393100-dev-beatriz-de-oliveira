@@ -46,13 +46,19 @@ export class BillingService {
       .replace(/\{data\}/g, this.formatDateToPtBr(order.data_vencimento));
 
     if (order.cobrancaCanal === "telegram") {
+      if (!order.telegramChatId) {
+        throw new AppError("Telegram chat id is required for this charge", 400, "BILLING_CHARGE_TELEGRAM_CHAT_REQUIRED");
+      }
       await this.telegramService.sendManualMessage({
-        chatId: order.telefone_cliente,
+        chatId: order.telegramChatId,
         texto: message,
       });
     } else {
+      if (!order.telefone) {
+        throw new AppError("Phone is required for this charge", 400, "BILLING_CHARGE_PHONE_REQUIRED");
+      }
       await this.whatsappService.sendManualMessage({
-        telefone: order.telefone_cliente,
+        telefone: order.telefone,
         texto: message,
       });
     }
