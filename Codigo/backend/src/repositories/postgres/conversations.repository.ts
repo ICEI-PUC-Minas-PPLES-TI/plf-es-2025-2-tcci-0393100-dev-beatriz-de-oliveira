@@ -57,7 +57,10 @@ export class PostgresConversationsRepository implements ConversationsRepository 
             a.cliente_id::text AS cliente_id,
             c.nome AS cliente,
             c.telefone,
-            a.whatsapp_chat_id AS contact_id,
+            CASE
+              WHEN upper(a.canal) = 'TELEGRAM' THEN a.telegram_chat_id
+              WHEN upper(a.canal) = 'WHATSAPP' THEN a.whatsapp_chat_id
+            END AS contact_id,
             a.status,
             a.canal,
             lm.conteudo AS ultima_mensagem,
@@ -65,7 +68,15 @@ export class PostgresConversationsRepository implements ConversationsRepository 
             a.iniciado_em,
             a.encerrado_em,
             a.ultima_interacao_em,
-            COALESCE(a.cliente_id::text, NULLIF(a.whatsapp_chat_id, ''), NULLIF(c.telefone, ''), a.atendimento_id::text) AS conversation_group_key
+            COALESCE(
+              a.cliente_id::text,
+              NULLIF(CASE
+                WHEN upper(a.canal) = 'TELEGRAM' THEN a.telegram_chat_id
+                WHEN upper(a.canal) = 'WHATSAPP' THEN a.whatsapp_chat_id
+              END, ''),
+              NULLIF(c.telefone, ''),
+              a.atendimento_id::text
+            ) AS conversation_group_key
           FROM atendimentos a
           LEFT JOIN clientes c ON c.cliente_id = a.cliente_id
           LEFT JOIN LATERAL (
@@ -156,6 +167,7 @@ export class PostgresConversationsRepository implements ConversationsRepository 
           SELECT
             a.cliente_id,
             a.canal,
+            a.telegram_chat_id,
             a.whatsapp_chat_id
           FROM atendimentos a
           WHERE abs(hashtext(a.atendimento_id::text)) = $1
@@ -177,7 +189,19 @@ export class PostgresConversationsRepository implements ConversationsRepository 
             OR (
               current.cliente_id IS NULL
               AND a.cliente_id IS NULL
-              AND COALESCE(a.whatsapp_chat_id, '') = COALESCE(current.whatsapp_chat_id, '')
+              AND COALESCE(
+                CASE
+                  WHEN upper(a.canal) = 'TELEGRAM' THEN a.telegram_chat_id
+                  WHEN upper(a.canal) = 'WHATSAPP' THEN a.whatsapp_chat_id
+                END,
+                ''
+              ) = COALESCE(
+                CASE
+                  WHEN upper(current.canal) = 'TELEGRAM' THEN current.telegram_chat_id
+                  WHEN upper(current.canal) = 'WHATSAPP' THEN current.whatsapp_chat_id
+                END,
+                ''
+              )
             )
         )
         SELECT
@@ -226,7 +250,10 @@ export class PostgresConversationsRepository implements ConversationsRepository 
           a.cliente_id::text AS cliente_id,
           c.nome AS cliente,
           c.telefone,
-          a.whatsapp_chat_id AS contact_id,
+          CASE
+            WHEN upper(a.canal) = 'TELEGRAM' THEN a.telegram_chat_id
+            WHEN upper(a.canal) = 'WHATSAPP' THEN a.whatsapp_chat_id
+          END AS contact_id,
           a.status,
           a.canal,
           lm.conteudo AS ultima_mensagem,
@@ -279,6 +306,7 @@ export class PostgresConversationsRepository implements ConversationsRepository 
             a.atendimento_id,
             a.cliente_id,
             a.canal,
+            a.telegram_chat_id,
             a.whatsapp_chat_id
           FROM atendimentos a
           WHERE abs(hashtext(a.atendimento_id::text)) = $1
@@ -290,7 +318,10 @@ export class PostgresConversationsRepository implements ConversationsRepository 
           a.cliente_id::text AS cliente_id,
           c.nome AS cliente,
           c.telefone,
-          a.whatsapp_chat_id AS contact_id,
+          CASE
+            WHEN upper(a.canal) = 'TELEGRAM' THEN a.telegram_chat_id
+            WHEN upper(a.canal) = 'WHATSAPP' THEN a.whatsapp_chat_id
+          END AS contact_id,
           a.status,
           a.canal,
           lm.conteudo AS ultima_mensagem,
@@ -314,7 +345,19 @@ export class PostgresConversationsRepository implements ConversationsRepository 
             OR (
               current.cliente_id IS NULL
               AND a.cliente_id IS NULL
-              AND COALESCE(a.whatsapp_chat_id, '') = COALESCE(current.whatsapp_chat_id, '')
+              AND COALESCE(
+                CASE
+                  WHEN upper(a.canal) = 'TELEGRAM' THEN a.telegram_chat_id
+                  WHEN upper(a.canal) = 'WHATSAPP' THEN a.whatsapp_chat_id
+                END,
+                ''
+              ) = COALESCE(
+                CASE
+                  WHEN upper(current.canal) = 'TELEGRAM' THEN current.telegram_chat_id
+                  WHEN upper(current.canal) = 'WHATSAPP' THEN current.whatsapp_chat_id
+                END,
+                ''
+              )
             )
           )
         ORDER BY COALESCE(a.ultima_interacao_em, a.encerrado_em, a.iniciado_em) DESC NULLS LAST

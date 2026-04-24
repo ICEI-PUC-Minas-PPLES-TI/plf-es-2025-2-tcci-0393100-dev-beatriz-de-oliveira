@@ -305,7 +305,7 @@ export class PostgresWhatsAppRepository implements WhatsAppRepository {
         FROM atendimentos a
         LEFT JOIN clientes c ON c.cliente_id = a.cliente_id
         WHERE a.canal = 'WHATSAPP'
-          AND (a.whatsapp_chat_id = $1 OR c.telefone = $1)
+          AND a.whatsapp_chat_id = $1
         ORDER BY a.ultima_interacao_em DESC NULLS LAST, a.iniciado_em DESC
         LIMIT 1
       `,
@@ -461,7 +461,7 @@ export class PostgresWhatsAppRepository implements WhatsAppRepository {
         FROM atendimentos a
         LEFT JOIN clientes c ON c.cliente_id = a.cliente_id
         WHERE a.canal = 'WHATSAPP'
-          AND (a.whatsapp_chat_id = $1 OR c.telefone = $1)
+          AND a.whatsapp_chat_id = $1
         ORDER BY a.ultima_interacao_em DESC NULLS LAST, a.iniciado_em DESC
         LIMIT 1
       `,

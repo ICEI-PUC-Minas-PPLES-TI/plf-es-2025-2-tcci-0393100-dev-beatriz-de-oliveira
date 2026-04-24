@@ -196,7 +196,7 @@ export class PostgresTelegramRepository implements TelegramRepository {
         FROM atendimentos a
         WHERE a.cliente_id = c.cliente_id
           AND a.canal = 'TELEGRAM'
-          AND a.whatsapp_chat_id = $1
+          AND a.telegram_chat_id = $1
       `,
       [chatId, name.trim()],
     );
@@ -208,7 +208,7 @@ export class PostgresTelegramRepository implements TelegramRepository {
         SELECT
           a.atendimento_id,
           abs(hashtext(a.atendimento_id::text)) AS numeric_id,
-          a.whatsapp_chat_id AS chat_id,
+          a.telegram_chat_id AS chat_id,
           c.nome AS cliente
         FROM atendimentos a
         LEFT JOIN clientes c ON c.cliente_id = a.cliente_id
@@ -237,7 +237,7 @@ export class PostgresTelegramRepository implements TelegramRepository {
         SELECT
           a.atendimento_id,
           abs(hashtext(a.atendimento_id::text)) AS numeric_id,
-          a.whatsapp_chat_id AS chat_id,
+          a.telegram_chat_id AS chat_id,
           c.nome AS cliente,
           a.status,
           a.encaminhado_humano,
@@ -255,7 +255,7 @@ export class PostgresTelegramRepository implements TelegramRepository {
           LIMIT 1
         ) lm ON TRUE
         WHERE a.canal = 'TELEGRAM'
-          AND a.whatsapp_chat_id = $1
+          AND a.telegram_chat_id = $1
         ORDER BY a.ultima_interacao_em DESC NULLS LAST, a.iniciado_em DESC
         LIMIT 1
       `,
@@ -288,7 +288,7 @@ export class PostgresTelegramRepository implements TelegramRepository {
           SELECT
             a.atendimento_id,
             abs(hashtext(a.atendimento_id::text)) AS numeric_id,
-            a.whatsapp_chat_id AS chat_id,
+            a.telegram_chat_id AS chat_id,
             c.nome AS cliente,
             a.status,
             a.encaminhado_humano,
@@ -348,7 +348,7 @@ export class PostgresTelegramRepository implements TelegramRepository {
           SELECT
             a.atendimento_id,
             abs(hashtext(a.atendimento_id::text)) AS numeric_id,
-            a.whatsapp_chat_id AS chat_id,
+            a.telegram_chat_id AS chat_id,
             c.nome AS cliente,
             a.status,
             a.encaminhado_humano,
@@ -415,13 +415,13 @@ export class PostgresTelegramRepository implements TelegramRepository {
         SELECT
           a.atendimento_id,
           abs(hashtext(a.atendimento_id::text)) AS numeric_id,
-          a.whatsapp_chat_id AS chat_id,
+          a.telegram_chat_id AS chat_id,
           c.nome AS cliente,
           a.status
         FROM atendimentos a
         LEFT JOIN clientes c ON c.cliente_id = a.cliente_id
         WHERE a.canal = 'TELEGRAM'
-          AND a.whatsapp_chat_id = $1
+          AND a.telegram_chat_id = $1
         ORDER BY a.ultima_interacao_em DESC NULLS LAST, a.iniciado_em DESC
         LIMIT 1
       `,
@@ -482,7 +482,7 @@ export class PostgresTelegramRepository implements TelegramRepository {
           status,
           iniciado_em,
           ultima_interacao_em,
-          whatsapp_chat_id,
+          telegram_chat_id,
           encaminhado_humano,
           ultima_intencao,
           estado_conversa
@@ -530,7 +530,7 @@ export class PostgresTelegramRepository implements TelegramRepository {
         FROM clientes c
         JOIN atendimentos a ON a.cliente_id = c.cliente_id
         WHERE a.canal = 'TELEGRAM'
-          AND a.whatsapp_chat_id = $1
+          AND a.telegram_chat_id = $1
         LIMIT 1
       `,
       [chatId],
@@ -612,7 +612,7 @@ export class PostgresTelegramRepository implements TelegramRepository {
         SELECT
           a.atendimento_id,
           abs(hashtext(a.atendimento_id::text)) AS numeric_id,
-          a.whatsapp_chat_id AS chat_id,
+          a.telegram_chat_id AS chat_id,
           c.nome AS cliente
         FROM atendimentos a
         LEFT JOIN clientes c ON c.cliente_id = a.cliente_id

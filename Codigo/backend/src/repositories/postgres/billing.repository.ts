@@ -23,7 +23,6 @@ type OrderRow = {
   cliente_uuid: string | null;
   cliente_nome: string | null;
   telefone_cliente: string | null;
-  telegram_chat_id: string | null;
   latest_channel: string | null;
   latest_attendance_contact_id: string | null;
   latest_telegram_chat_id: string | null;
@@ -448,7 +447,6 @@ export class PostgresBillingRepository implements BillingRepository {
         p.cliente_id::text AS cliente_uuid,
         c.nome AS cliente_nome,
         COALESCE(m.telefone_cliente, c.telefone) AS telefone_cliente,
-        telegram.chat_id AS telegram_chat_id,
         latest_attendance.canal AS latest_channel,
         latest_attendance.contact_id AS latest_attendance_contact_id,
         CASE WHEN latest_attendance.canal = 'telegram' THEN latest_attendance.contact_id END AS latest_telegram_chat_id,
@@ -470,17 +468,12 @@ export class PostgresBillingRepository implements BillingRepository {
       LEFT JOIN clientes c ON c.cliente_id = p.cliente_id
       LEFT JOIN pedido_cobranca_meta m ON m.pedido_id = p.pedido_id
       LEFT JOIN LATERAL (
-        SELECT a.whatsapp_chat_id AS chat_id
-        FROM atendimentos a
-        WHERE a.cliente_id = p.cliente_id
-          AND a.canal = 'TELEGRAM'
-          AND a.whatsapp_chat_id IS NOT NULL
-          AND btrim(a.whatsapp_chat_id) <> ''
-        ORDER BY COALESCE(a.ultima_interacao_em, a.iniciado_em) DESC NULLS LAST
-        LIMIT 1
-      ) telegram ON TRUE
-      LEFT JOIN LATERAL (
-        SELECT lower(a.canal) AS canal, a.whatsapp_chat_id AS contact_id
+        SELECT
+          lower(a.canal) AS canal,
+          CASE
+            WHEN upper(a.canal) = 'TELEGRAM' THEN a.telegram_chat_id
+            WHEN upper(a.canal) = 'WHATSAPP' THEN a.whatsapp_chat_id
+          END AS contact_id
         FROM atendimentos a
         WHERE a.cliente_id = p.cliente_id
         ORDER BY COALESCE(a.ultima_interacao_em, a.iniciado_em) DESC NULLS LAST
@@ -545,19 +538,17 @@ export class PostgresBillingRepository implements BillingRepository {
   }
 
   private resolveDeliveryTarget(
-    row: Pick<OrderRow, "numeric_id" | "cliente_uuid" | "telegram_chat_id" | "latest_channel" | "latest_attendance_contact_id" | "latest_telegram_chat_id" | "latest_whatsapp_chat_id">,
+    row: Pick<OrderRow, "numeric_id" | "cliente_uuid" | "latest_channel" | "latest_attendance_contact_id" | "latest_telegram_chat_id" | "latest_whatsapp_chat_id">,
   ): DeliveryTarget {
     const latestChannel = row.latest_channel?.trim().toLowerCase() ?? null;
     const latestAttendanceContactId = row.latest_attendance_contact_id?.trim();
     const latestTelegramChatId = row.latest_telegram_chat_id?.trim();
-    const explicitTelegramChatId = row.telegram_chat_id?.trim();
 
     let result: DeliveryTarget;
 
     if (latestChannel === "telegram") {
       const telegramChatId =
         latestTelegramChatId
-        ?? explicitTelegramChatId
         ?? latestAttendanceContactId
         ?? null;
 
@@ -641,6 +632,7 @@ export class PostgresBillingRepository implements BillingRepository {
       cliente_id: row.cliente_uuid ?? null,
       canal_ultimo_atendimento: row.latest_channel ?? null,
       telegram_chat_id: row.latest_telegram_chat_id ?? null,
+      whatsapp_chat_id: row.latest_whatsapp_chat_id ?? null,
       canal_final: result.channel ?? null,
       telegramChatId_final: result.telegramChatId ?? null,
       contatoExibicao_final: result.displayTarget,
