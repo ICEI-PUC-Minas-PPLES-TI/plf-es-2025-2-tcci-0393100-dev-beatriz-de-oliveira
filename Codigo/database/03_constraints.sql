@@ -4,7 +4,7 @@ alter table public.atendimentos
 
 alter table public.mensagens
   add constraint mensagens_remetente_check
-  check (remetente in ('CLIENTE','CHATBOT','HUMANO'));
+  check (remetente in ('CLIENTE','CHATBOT','ATENDENTE'));
 
 alter table public.mensagens
   add constraint mensagens_direcao_check

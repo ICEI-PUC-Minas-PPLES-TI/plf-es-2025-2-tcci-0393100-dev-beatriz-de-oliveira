@@ -18,6 +18,15 @@ export class ConversationsService {
     return this.repository.listMessages(conversationId);
   }
 
+  async listFullHistory(conversationId: number) {
+    const conversation = await this.repository.findConversationById(conversationId);
+    if (!conversation) {
+      throw new AppError("Conversation not found", 404, "CONVERSATION_NOT_FOUND");
+    }
+
+    return this.repository.listFullHistory(conversationId);
+  }
+
   async listPreviousConversations(conversationId: number) {
     const conversation = await this.repository.findConversationById(conversationId);
     if (!conversation) {

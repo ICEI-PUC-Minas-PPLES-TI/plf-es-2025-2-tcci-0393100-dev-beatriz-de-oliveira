@@ -273,6 +273,9 @@ export const adminDataService = {
   listConversationMessages: (conversationId: number) =>
     (async () => (await httpClient.get<ApiListResponse<Mensagem>>(API_ENDPOINTS.conversationMessages(conversationId))).data)(),
 
+  listConversationFullHistory: (conversationId: number) =>
+    (async () => (await httpClient.get<ApiListResponse<Mensagem>>(API_ENDPOINTS.conversationFullHistory(conversationId))).data)(),
+
   listPreviousConversations: (conversationId: number) =>
     getMockOrApiData<AtendimentoHistorico[]>(
       () => [],

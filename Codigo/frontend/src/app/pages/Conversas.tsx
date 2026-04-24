@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
-import { Bot, CheckCircle2, ChevronDown, ChevronUp, Headphones, History, MessageCircle, Search, Send, Smartphone, UserRound, X } from "lucide-react";
+import { Bot, CheckCircle2, Headphones, MessageCircle, Search, Send, Smartphone, UserRound, X } from "lucide-react";
 import { toast } from "sonner";
 import { HttpError } from "../api/httpClient";
 import { StatusBadge } from "../components/StatusBadge";
@@ -14,12 +14,15 @@ import { Label } from "../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Skeleton } from "../components/ui/skeleton";
 import { Textarea } from "../components/ui/textarea";
-import { useConversationMessagesData, useConversationsData, usePreviousConversationsData, useProdutosLookup } from "../hooks/useAdminData";
+import { useConversationFullHistoryData, useConversationsData, useProdutosLookup } from "../hooks/useAdminData";
 import { adminDataService } from "../services/adminDataService";
-import type { AtendimentoHistorico, AtendimentoStatus, ConversationChannel, LeadStatus, Mensagem } from "../types/domain";
+import type { AtendimentoStatus, ConversationChannel, LeadStatus, Mensagem } from "../types/domain";
 
 type ChannelFilter = "todos" | ConversationChannel;
 type SenderKind = "cliente" | "chatbot" | "humano";
+type TimelineItem =
+  | { kind: "message"; key: string; message: Mensagem }
+  | { kind: "separator"; key: string; label: string; timestamp: string };
 
 function formatDateTime(value: string): string {
   const parsed = new Date(value);
@@ -147,27 +150,9 @@ function ConversationListSkeleton() {
 function MessageListSkeleton() {
   return (
     <div className="space-y-4 p-4">
-      {Array.from({ length: 5 }).map((_, index) => (
+      {Array.from({ length: 6 }).map((_, index) => (
         <div key={index} className={`flex ${index % 2 === 0 ? "justify-start" : "justify-end"}`}>
           <Skeleton className="h-20 w-64 rounded-2xl" />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function PreviousConversationsSkeleton() {
-  return (
-    <div className="space-y-3">
-      {Array.from({ length: 2 }).map((_, index) => (
-        <div key={index} className="rounded-2xl border bg-white p-4">
-          <div className="flex items-center justify-between gap-3">
-            <Skeleton className="h-4 w-44" />
-            <Skeleton className="h-5 w-20 rounded-full" />
-          </div>
-          <Skeleton className="mt-3 h-3 w-56" />
-          <Skeleton className="mt-2 h-3 w-48" />
-          <Skeleton className="mt-3 h-3 w-full" />
         </div>
       ))}
     </div>
@@ -196,45 +181,64 @@ function MessageBubble({ message }: { message: Mensagem }) {
   );
 }
 
-function PreviousConversationCard({
-  conversation,
-  isExpanded,
-  onToggle,
-}: {
-  conversation: AtendimentoHistorico;
-  isExpanded: boolean;
-  onToggle: () => void;
-}) {
+function TimelineSeparator({ label, timestamp }: { label: string; timestamp: string }) {
   return (
-    <div className="rounded-2xl border bg-white p-4 shadow-sm">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-gray-900">Atendimento iniciado em {formatDateTime(conversation.iniciadoEm ?? conversation.horario)}</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {conversation.encerradoEm ? `Encerrado em ${formatDateTime(conversation.encerradoEm)}` : "Atendimento sem encerramento registrado"}
-          </p>
-          <p className="mt-2 text-sm text-gray-600">{conversation.ultima_mensagem || "Sem mensagens registradas."}</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <StatusBadge status={conversation.status} />
-          <Button type="button" variant="outline" size="sm" onClick={onToggle}>
-            {isExpanded ? <ChevronUp className="mr-2 h-4 w-4" /> : <ChevronDown className="mr-2 h-4 w-4" />}
-            {isExpanded ? "Ocultar mensagens" : "Ver mensagens"}
-          </Button>
-        </div>
+    <div className="flex items-center gap-3 py-2">
+      <div className="h-px flex-1 bg-gray-200" />
+      <div className="rounded-full border border-gray-200 bg-white px-3 py-1 text-center shadow-sm">
+        <p className="text-xs font-medium text-gray-700">{label}</p>
+        <p className="text-[11px] text-muted-foreground">{formatDateTime(timestamp)}</p>
       </div>
-
-      {isExpanded && (
-        <div className="mt-4 space-y-3 border-t pt-4">
-          {conversation.messages.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nenhuma mensagem registrada neste atendimento.</p>
-          ) : (
-            conversation.messages.map((message) => <MessageBubble key={message.id} message={message} />)
-          )}
-        </div>
-      )}
+      <div className="h-px flex-1 bg-gray-200" />
     </div>
   );
+}
+
+function buildTimelineItems(messages: Mensagem[]): TimelineItem[] {
+  const items: TimelineItem[] = [];
+  let currentConversationId: number | undefined;
+  let previousAttendanceEndedAt: string | undefined;
+
+  for (const message of messages) {
+    if (message.conversationId !== currentConversationId) {
+      if (currentConversationId !== undefined && previousAttendanceEndedAt) {
+        items.push({
+          kind: "separator",
+          key: `closed-${currentConversationId}-${previousAttendanceEndedAt}`,
+          label: "Atendimento encerrado",
+          timestamp: previousAttendanceEndedAt,
+        });
+      }
+
+      items.push({
+        kind: "separator",
+        key: `started-${message.conversationId ?? message.id}-${message.atendimentoIniciadoEm ?? message.horario}`,
+        label: "Novo atendimento iniciado",
+        timestamp: message.atendimentoIniciadoEm ?? message.horario,
+      });
+      currentConversationId = message.conversationId;
+    }
+
+    items.push({
+      kind: "message",
+      key: `message-${message.id}`,
+      message,
+    });
+
+    previousAttendanceEndedAt = message.atendimentoEncerradoEm;
+  }
+
+  const lastMessage = messages.length > 0 ? messages[messages.length - 1] : undefined;
+  if (lastMessage?.atendimentoEncerradoEm && lastMessage.conversationId !== undefined) {
+    items.push({
+      kind: "separator",
+      key: `closed-${lastMessage.conversationId}-${lastMessage.atendimentoEncerradoEm}`,
+      label: "Atendimento encerrado",
+      timestamp: lastMessage.atendimentoEncerradoEm,
+    });
+  }
+
+  return items;
 }
 
 function isValidChannelFilter(value: string | null): value is ConversationChannel {
@@ -258,8 +262,6 @@ export function Conversas() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedConversationId, setSelectedConversationId] = useState<number | null>(null);
   const [newMessage, setNewMessage] = useState("");
-  const [showPreviousConversations, setShowPreviousConversations] = useState(false);
-  const [expandedPreviousConversationIds, setExpandedPreviousConversationIds] = useState<number[]>([]);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [isUpdatingConversation, setIsUpdatingConversation] = useState(false);
   const [isUpdatingLeadStatus, setIsUpdatingLeadStatus] = useState(false);
@@ -321,21 +323,11 @@ export function Conversas() {
 
   const selectedConversation = filteredConversations.find((conversation) => conversation.id === selectedConversationId) ?? null;
   const {
-    data: messages,
+    data: fullHistoryMessages,
     reload: reloadMessages,
     isLoading: messagesLoading,
     error: messagesError,
-  } = useConversationMessagesData(selectedConversation?.id ?? null);
-  const {
-    data: previousConversations,
-    isLoading: previousConversationsLoading,
-    error: previousConversationsError,
-  } = usePreviousConversationsData(selectedConversation?.id ?? null, showPreviousConversations);
-
-  useEffect(() => {
-    setShowPreviousConversations(false);
-    setExpandedPreviousConversationIds([]);
-  }, [selectedConversation?.id]);
+  } = useConversationFullHistoryData(selectedConversation?.id ?? null);
 
   useEffect(() => {
     if (!selectedConversation?.id) {
@@ -355,12 +347,6 @@ export function Conversas() {
   const canSendManualMessage = Boolean(selectedConversation && selectedConversation.status !== "ENCERRADO");
   const canUpdateStatus = Boolean(selectedConversation);
   const canFinalizeOrder = Boolean(selectedConversation && selectedConversation.status !== "ENCERRADO");
-
-  const togglePreviousConversationExpansion = (conversationId: number) => {
-    setExpandedPreviousConversationIds((current) =>
-      current.includes(conversationId) ? current.filter((item) => item !== conversationId) : [...current, conversationId],
-    );
-  };
 
   const handleAtualizarLeadStatus = async (status: Extract<LeadStatus, "CONVERTIDO" | "PERDIDO">) => {
     if (!selectedConversation?.leadId) {
@@ -386,8 +372,6 @@ export function Conversas() {
     setChannelFilter(normalizedFilter);
     setStatusFilter("todos");
     setSelectedConversationId(null);
-    setShowPreviousConversations(false);
-    setExpandedPreviousConversationIds([]);
     setSearchTerm("");
 
     if (normalizedFilter === "todos") {
@@ -518,16 +502,10 @@ export function Conversas() {
 
   const conversationVisual = getChannelVisual(selectedConversation?.channel);
   const ConversationChannelIcon = conversationVisual.icon;
+  const timelineItems = useMemo(() => buildTimelineItems(fullHistoryMessages), [fullHistoryMessages]);
 
   return (
     <div className="flex h-[calc(100vh-7rem)] min-h-0 flex-col gap-4 overflow-hidden">
-      <div className="hidden">
-        <h2 className="text-2xl font-bold text-gray-900">Conversas</h2>
-        <p className="text-muted-foreground">Painel único de atendimento para WhatsApp e Telegram, com visão operacional do atendimento.</p>
-        {conversationsError && <p className="text-sm text-red-600">Erro ao carregar conversas: {conversationsError}</p>}
-        {messagesError && <p className="text-sm text-red-600">Erro ao carregar mensagens: {messagesError}</p>}
-      </div>
-
       {(conversationsError || messagesError) && (
         <div className="space-y-1">
           {conversationsError && <p className="text-sm text-red-600">Erro ao carregar conversas: {conversationsError}</p>}
@@ -649,7 +627,7 @@ export function Conversas() {
           {!selectedConversation ? (
             <EmptyConversationState
               title="Selecione uma conversa"
-              description="Escolha um atendimento da lista para visualizar o histórico e as ações operacionais."
+              description="Escolha um cliente da lista para visualizar a timeline completa e as ações operacionais."
             />
           ) : (
             <>
@@ -680,11 +658,7 @@ export function Conversas() {
                           <ConversationChannelIcon className="mr-1.5 h-3.5 w-3.5" />
                           {conversationVisual.label}
                         </Button>
-                        <Button
-                          variant="default"
-                          size="sm"
-                          className={getStatusButtonClasses(selectedConversation.status)}
-                        >
+                        <Button variant="default" size="sm" className={getStatusButtonClasses(selectedConversation.status)}>
                           {selectedConversation.status === "ATIVO" ? "Ativo" : selectedConversation.status === "PENDENTE" ? "Pendente" : "Encerrado"}
                         </Button>
                         {selectedConversation.leadStatus && <StatusBadge status={selectedConversation.leadStatus} />}
@@ -751,64 +725,29 @@ export function Conversas() {
 
                   <p className="text-xs text-muted-foreground">
                     {selectedConversation.status === "ENCERRADO"
-                      ? "Este atendimento foi encerrado."
-                      : "O atendimento manual está ativo para este canal."}
+                      ? "O ciclo atual deste cliente está encerrado, mas toda a conversa continua visível na timeline."
+                      : "A timeline abaixo reúne todos os atendimentos deste cliente no mesmo canal."}
                   </p>
-
-                  <div className="rounded-2xl border bg-white p-3">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">Histórico do cliente</p>
-                        <p className="text-xs text-muted-foreground">Veja atendimentos anteriores sem misturar com o ciclo atual.</p>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setShowPreviousConversations((current) => !current)}
-                      >
-                        <History className="mr-2 h-4 w-4" />
-                        {showPreviousConversations ? "Ocultar atendimentos anteriores" : "Ver atendimentos anteriores"}
-                      </Button>
-                    </div>
-
-                    {showPreviousConversations && (
-                      <div className="mt-4">
-                        {previousConversationsLoading ? (
-                          <PreviousConversationsSkeleton />
-                        ) : previousConversationsError ? (
-                          <p className="text-sm text-red-600">Erro ao carregar histórico: {previousConversationsError}</p>
-                        ) : previousConversations.length === 0 ? (
-                          <p className="text-sm text-muted-foreground">Não há atendimentos anteriores para este cliente.</p>
-                        ) : (
-                          <div className="max-h-72 space-y-3 overflow-y-auto pr-1">
-                            {previousConversations.map((conversation) => (
-                              <PreviousConversationCard
-                                key={conversation.id}
-                                conversation={conversation}
-                                isExpanded={expandedPreviousConversationIds.includes(conversation.id)}
-                                onToggle={() => togglePreviousConversationExpansion(conversation.id)}
-                              />
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
                 </div>
               </div>
 
               <div className="min-h-0 flex-1 overflow-y-auto bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_100%)] p-4">
                 {messagesLoading ? (
                   <MessageListSkeleton />
-                ) : messages.length === 0 ? (
+                ) : timelineItems.length === 0 ? (
                   <EmptyConversationState
                     title="Sem mensagens nesta conversa"
-                    description="Assim que houver troca de mensagens neste canal, elas aparecerão aqui em ordem cronológica."
+                    description="Assim que houver troca de mensagens neste canal, elas aparecerão aqui em uma timeline contínua."
                   />
                 ) : (
                   <div className="space-y-4">
-                    {messages.map((message) => <MessageBubble key={message.id} message={message} />)}
+                    {timelineItems.map((item) =>
+                      item.kind === "separator" ? (
+                        <TimelineSeparator key={item.key} label={item.label} timestamp={item.timestamp} />
+                      ) : (
+                        <MessageBubble key={item.key} message={item.message} />
+                      ),
+                    )}
                   </div>
                 )}
               </div>

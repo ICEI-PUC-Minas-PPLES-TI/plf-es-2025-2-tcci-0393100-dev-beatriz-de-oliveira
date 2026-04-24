@@ -115,6 +115,8 @@ export interface Mensagem {
   conversationId?: number;
   channel?: ConversationChannel;
   type?: string;
+  atendimentoIniciadoEm?: string;
+  atendimentoEncerradoEm?: string;
 }
 
 export interface DashboardTopProduto {

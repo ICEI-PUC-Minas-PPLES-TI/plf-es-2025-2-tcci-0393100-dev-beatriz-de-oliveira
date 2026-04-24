@@ -10,6 +10,7 @@ export const API_ENDPOINTS = {
   billingRuns: "/billing-rules/runs",
   conversations: "/conversations",
   conversationMessages: (conversationId: number) => `/conversations/${conversationId}/messages`,
+  conversationFullHistory: (conversationId: number) => `/conversations/${conversationId}/full-history`,
   conversationPrevious: (conversationId: number) => `/conversations/${conversationId}/previous`,
   conversationSendMessage: (conversationId: number) => `/conversations/${conversationId}/messages`,
   conversationStatus: (conversationId: number) => `/conversations/${conversationId}/status`,

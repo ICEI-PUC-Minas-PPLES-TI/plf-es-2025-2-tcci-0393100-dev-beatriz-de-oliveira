@@ -73,6 +73,17 @@ export function useConversationMessagesData(conversationId: number | null) {
   return useAsyncData<Mensagem[]>(loader, [], { enabled: conversationId !== null });
 }
 
+export function useConversationFullHistoryData(conversationId: number | null) {
+  const loader = useCallback(() => {
+    if (conversationId === null) {
+      return Promise.resolve([] as Mensagem[]);
+    }
+    return adminDataService.listConversationFullHistory(conversationId);
+  }, [conversationId]);
+
+  return useAsyncData<Mensagem[]>(loader, [], { enabled: conversationId !== null });
+}
+
 export function usePreviousConversationsData(conversationId: number | null, enabled = true) {
   const loader = useCallback(() => {
     if (conversationId === null) {

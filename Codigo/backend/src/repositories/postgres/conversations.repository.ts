@@ -25,6 +25,11 @@ type MessageRow = {
   data_envio: string | null;
   direcao: string | null;
   remetente: string | null;
+  atendimento_numeric_id?: number;
+  atendimento_iniciado_em?: string | null;
+  atendimento_encerrado_em?: string | null;
+  atendimento_status?: string | null;
+  canal?: string | null;
 };
 
 type HistoryMessageRow = MessageRow & {
@@ -40,36 +45,64 @@ export class PostgresConversationsRepository implements ConversationsRepository 
         : "";
 
     if (channel && channel.trim()) {
-      values.push(channel.trim().toUpperCase());
+      values.push(channel.trim().toLowerCase());
     }
 
     const result = await pool.query<ConversationRow>(
       `
+        WITH base AS (
+          SELECT
+            a.atendimento_id,
+            abs(hashtext(a.atendimento_id::text)) AS numeric_id,
+            a.cliente_id::text AS cliente_id,
+            c.nome AS cliente,
+            c.telefone,
+            a.whatsapp_chat_id AS contact_id,
+            a.status,
+            a.canal,
+            lm.conteudo AS ultima_mensagem,
+            COALESCE(lm.data_envio, a.ultima_interacao_em, a.iniciado_em) AS horario,
+            a.iniciado_em,
+            a.encerrado_em,
+            a.ultima_interacao_em,
+            COALESCE(a.cliente_id::text, NULLIF(a.whatsapp_chat_id, ''), NULLIF(c.telefone, ''), a.atendimento_id::text) AS conversation_group_key
+          FROM atendimentos a
+          LEFT JOIN clientes c ON c.cliente_id = a.cliente_id
+          LEFT JOIN LATERAL (
+            SELECT m.conteudo, m.data_envio
+            FROM mensagens m
+            WHERE m.atendimento_id = a.atendimento_id
+            ORDER BY m.xmin::text::bigint DESC, m.data_envio DESC NULLS LAST, m.mensagem_id DESC
+            LIMIT 1
+          ) lm ON TRUE
+          ${filter}
+        ),
+        ranked AS (
+          SELECT
+            base.*,
+            row_number() OVER (
+              PARTITION BY lower(base.canal), base.conversation_group_key
+              ORDER BY COALESCE(base.ultima_interacao_em, base.horario, base.iniciado_em) DESC NULLS LAST, base.numeric_id DESC
+            ) AS row_rank
+          FROM base
+        )
         SELECT
-          a.atendimento_id,
-          abs(hashtext(a.atendimento_id::text)) AS numeric_id,
-          a.cliente_id::text AS cliente_id,
-          c.nome AS cliente,
-          c.telefone,
-          a.whatsapp_chat_id AS contact_id,
-          a.status,
-          a.canal,
-          lm.conteudo AS ultima_mensagem,
-          COALESCE(lm.data_envio, a.ultima_interacao_em, a.iniciado_em) AS horario,
-          a.iniciado_em,
-          a.encerrado_em,
-          a.ultima_interacao_em
-        FROM atendimentos a
-        LEFT JOIN clientes c ON c.cliente_id = a.cliente_id
-        LEFT JOIN LATERAL (
-          SELECT m.conteudo, m.data_envio
-          FROM mensagens m
-          WHERE m.atendimento_id = a.atendimento_id
-          ORDER BY m.xmin::text::bigint DESC, m.data_envio DESC NULLS LAST, m.mensagem_id DESC
-          LIMIT 1
-        ) lm ON TRUE
-        ${filter}
-        ORDER BY COALESCE(lm.data_envio, a.ultima_interacao_em, a.iniciado_em) DESC NULLS LAST
+          atendimento_id,
+          numeric_id,
+          cliente_id,
+          cliente,
+          telefone,
+          contact_id,
+          status,
+          canal,
+          ultima_mensagem,
+          horario,
+          iniciado_em,
+          encerrado_em,
+          ultima_interacao_em
+        FROM ranked
+        WHERE row_rank = 1
+        ORDER BY COALESCE(ultima_interacao_em, horario, iniciado_em) DESC NULLS LAST
       `,
       values,
     );
@@ -114,6 +147,74 @@ export class PostgresConversationsRepository implements ConversationsRepository 
       remetente: row.remetente ?? undefined,
       conversationId,
     }));
+  }
+
+  async listFullHistory(conversationId: number): Promise<Mensagem[]> {
+    const result = await pool.query<MessageRow>(
+      `
+        WITH current_conversation AS (
+          SELECT
+            a.cliente_id,
+            a.canal,
+            a.whatsapp_chat_id
+          FROM atendimentos a
+          WHERE abs(hashtext(a.atendimento_id::text)) = $1
+          LIMIT 1
+        ),
+        related_attendances AS (
+          SELECT
+            a.atendimento_id,
+            abs(hashtext(a.atendimento_id::text)) AS numeric_id,
+            a.iniciado_em,
+            a.encerrado_em,
+            a.status,
+            a.canal
+          FROM atendimentos a
+          INNER JOIN current_conversation current ON current.canal = a.canal
+          LEFT JOIN clientes c ON c.cliente_id = a.cliente_id
+          WHERE
+            (current.cliente_id IS NOT NULL AND a.cliente_id = current.cliente_id)
+            OR (
+              current.cliente_id IS NULL
+              AND a.cliente_id IS NULL
+              AND COALESCE(a.whatsapp_chat_id, '') = COALESCE(current.whatsapp_chat_id, '')
+            )
+        )
+        SELECT
+          m.mensagem_id,
+          abs(hashtext(m.mensagem_id::text)) AS numeric_id,
+          m.conteudo,
+          m.data_envio,
+          m.direcao,
+          m.remetente,
+          related.numeric_id AS atendimento_numeric_id,
+          related.iniciado_em AS atendimento_iniciado_em,
+          related.encerrado_em AS atendimento_encerrado_em,
+          related.status AS atendimento_status,
+          related.canal
+        FROM related_attendances related
+        INNER JOIN mensagens m ON m.atendimento_id = related.atendimento_id
+        ORDER BY
+          COALESCE(related.iniciado_em, m.data_envio) ASC NULLS LAST,
+          m.data_envio ASC NULLS LAST,
+          m.xmin::text::bigint ASC,
+          m.mensagem_id ASC
+      `,
+      [conversationId],
+    );
+
+    return result.rows.map((row) => ({
+      id: Number(row.numeric_id),
+      tipo: row.direcao === "SAIDA" ? "enviada" : "recebida",
+      conteudo: row.conteudo,
+      horario: row.data_envio ?? new Date().toISOString(),
+      remetente: row.remetente ?? undefined,
+      conversationId: row.atendimento_numeric_id,
+      channel: row.canal?.toLowerCase() === "telegram" ? "telegram" : "whatsapp",
+      type: row.atendimento_status ?? undefined,
+      atendimentoIniciadoEm: row.atendimento_iniciado_em ?? undefined,
+      atendimentoEncerradoEm: row.atendimento_encerrado_em ?? undefined,
+    } as Mensagem));
   }
 
   async findConversationById(conversationId: number): Promise<Atendimento | null> {

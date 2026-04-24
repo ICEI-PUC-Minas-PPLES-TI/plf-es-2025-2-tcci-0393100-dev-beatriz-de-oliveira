@@ -341,7 +341,7 @@ export class WhatsAppService {
       text: input.texto,
       messageId: delivery.messageId,
       statusEntrega: delivery.status,
-      remetente: "atendente",
+      remetente: "ATENDENTE",
     });
 
     if (savedMessage.conversationId) {

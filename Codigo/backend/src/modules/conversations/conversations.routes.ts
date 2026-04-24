@@ -48,6 +48,29 @@ export async function conversationsRoutes(fastify: FastifyInstance) {
   );
 
   fastify.get(
+    "/:conversationId/full-history",
+    {
+      schema: {
+        tags: ["Conversations"],
+        summary: "Lista o histórico completo de mensagens da conversa agrupada por cliente/canal",
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["conversationId"],
+          properties: {
+            conversationId: { type: "number" },
+          },
+        },
+      },
+    },
+    async (request) => {
+      const params = request.params as { conversationId: number };
+      const data = await container.conversationsService.listFullHistory(params.conversationId);
+      return { data };
+    },
+  );
+
+  fastify.get(
     "/:conversationId/previous",
     {
       schema: {
