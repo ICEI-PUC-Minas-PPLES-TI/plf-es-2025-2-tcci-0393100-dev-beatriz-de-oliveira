@@ -47,8 +47,7 @@ const CHARGE_KIND_LABEL: Record<BillingChargeKind, string> = {
 
 const formatChargeChannelLabel = (channel?: Pedido["cobrancaCanal"]) => {
   if (channel === "telegram") return "Telegram";
-  if (channel === "whatsapp") return "WhatsApp";
-  return "Sem canal cadastrado";
+  return "Sem canal disponível";
 };
 
 const formatIsoDateToPtBr = (isoDate: string) => {
@@ -637,7 +636,7 @@ export function Cobrancas() {
                               <TableCell className="text-sm">
                                 <div
                                   className="text-gray-900"
-                                  title={cobranca.cobrancaCanalDisponivel ? undefined : cobranca.cobrancaMotivoIndisponivel ?? "Sem canal cadastrado"}
+                                  title={cobranca.cobrancaCanalDisponivel ? undefined : cobranca.cobrancaMotivoIndisponivel ?? "Sem canal disponível"}
                                 >
                                   {formatChargeChannelLabel(cobranca.cobrancaCanal)}
                                 </div>
@@ -661,7 +660,7 @@ export function Cobrancas() {
                                   variant="outline"
                                   onClick={() => handleOpenSendCharge(cobranca)}
                                   disabled={!cobranca.cobrancaCanalDisponivel || isSendingCharge}
-                                  title={cobranca.cobrancaCanalDisponivel ? "Enviar cobrança agora" : cobranca.cobrancaMotivoIndisponivel ?? "Sem canal cadastrado"}
+                                  title={cobranca.cobrancaCanalDisponivel ? "Enviar cobrança agora" : cobranca.cobrancaMotivoIndisponivel ?? "Sem canal disponível"}
                                 >
                                   <Send className="mr-2 h-4 w-4" />
                                   Enviar agora
@@ -866,7 +865,7 @@ export function Cobrancas() {
                 <div>
                   <p className="text-xs uppercase tracking-wide text-muted-foreground">Canal / contato</p>
                   <p className="text-sm font-medium text-gray-900">
-                    {formatChargeChannelLabel(selectedCharge.cobrancaCanal)} • {selectedCharge.contatoExibicao || "Sem contato"}
+                    {formatChargeChannelLabel(selectedCharge.cobrancaCanal)} • {selectedCharge.contatoExibicao || "Sem canal disponível"}
                   </p>
                 </div>
                 <div>

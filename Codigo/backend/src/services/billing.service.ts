@@ -30,8 +30,8 @@ export class BillingService {
       throw new AppError("Charge not found", 404, "BILLING_CHARGE_NOT_FOUND");
     }
 
-    if (!order.cobrancaCanalDisponivel) {
-      throw new AppError(order.cobrancaMotivoIndisponivel ?? "No valid delivery channel available", 400, "BILLING_CHARGE_CHANNEL_UNAVAILABLE");
+    if (!order.cobrancaCanalDisponivel || order.cobrancaCanal !== "telegram") {
+      throw new AppError("Canal não disponível para envio", 400, "BILLING_CHARGE_CHANNEL_UNAVAILABLE");
     }
 
     const rule = await this.repository.getRule();
@@ -45,23 +45,14 @@ export class BillingService {
       .replace(/\{valor\}/g, order.valor_total)
       .replace(/\{data\}/g, this.formatDateToPtBr(order.data_vencimento));
 
-    if (order.cobrancaCanal === "telegram") {
-      if (!order.telegramChatId) {
-        throw new AppError("Telegram chat id is required for this charge", 400, "BILLING_CHARGE_TELEGRAM_CHAT_REQUIRED");
-      }
-      await this.telegramService.sendManualMessage({
-        chatId: order.telegramChatId,
-        texto: message,
-      });
-    } else {
-      if (!order.telefone) {
-        throw new AppError("Phone is required for this charge", 400, "BILLING_CHARGE_PHONE_REQUIRED");
-      }
-      await this.whatsappService.sendManualMessage({
-        telefone: order.telefone,
-        texto: message,
-      });
+    if (!order.telegramChatId) {
+      throw new AppError("Telegram chat id is required for this charge", 400, "BILLING_CHARGE_TELEGRAM_CHAT_REQUIRED");
     }
+
+    await this.telegramService.sendManualMessage({
+      chatId: order.telegramChatId,
+      texto: message,
+    });
 
     return this.repository.sendManualCharge(orderId, message);
   }

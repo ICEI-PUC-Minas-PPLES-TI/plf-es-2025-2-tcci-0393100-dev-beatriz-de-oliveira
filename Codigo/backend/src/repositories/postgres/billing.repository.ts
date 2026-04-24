@@ -25,6 +25,9 @@ type OrderRow = {
   telefone_cliente: string | null;
   telegram_chat_id: string | null;
   latest_channel: string | null;
+  latest_attendance_contact_id: string | null;
+  latest_telegram_chat_id: string | null;
+  latest_whatsapp_chat_id: string | null;
   numero_pedido: string | null;
   valor_total: string | number | null;
   forma_pagamento: string | null;
@@ -58,7 +61,6 @@ type DeliveryTarget = {
   channel?: SendChannel;
   reason?: string;
   displayTarget: string;
-  phone?: string;
   telegramChatId?: string;
 };
 
@@ -448,6 +450,9 @@ export class PostgresBillingRepository implements BillingRepository {
         COALESCE(m.telefone_cliente, c.telefone) AS telefone_cliente,
         telegram.chat_id AS telegram_chat_id,
         latest_attendance.canal AS latest_channel,
+        latest_attendance.contact_id AS latest_attendance_contact_id,
+        CASE WHEN latest_attendance.canal = 'telegram' THEN latest_attendance.contact_id END AS latest_telegram_chat_id,
+        CASE WHEN latest_attendance.canal = 'whatsapp' THEN latest_attendance.contact_id END AS latest_whatsapp_chat_id,
         m.numero_pedido,
         p.valor_total,
         p.forma_pagamento,
@@ -475,7 +480,7 @@ export class PostgresBillingRepository implements BillingRepository {
         LIMIT 1
       ) telegram ON TRUE
       LEFT JOIN LATERAL (
-        SELECT lower(a.canal) AS canal
+        SELECT lower(a.canal) AS canal, a.whatsapp_chat_id AS contact_id
         FROM atendimentos a
         WHERE a.cliente_id = p.cliente_id
         ORDER BY COALESCE(a.ultima_interacao_em, a.iniciado_em) DESC NULLS LAST
@@ -499,7 +504,6 @@ export class PostgresBillingRepository implements BillingRepository {
       numero_pedido: row.numero_pedido ?? `PED-${String(row.numeric_id).padStart(6, "0")}`,
       cliente: row.cliente_nome ?? "Cliente sem nome",
       telefone_cliente: row.telefone_cliente ?? "",
-      telefone: channelInfo.phone,
       telegramChatId: channelInfo.telegramChatId,
       contatoExibicao: channelInfo.displayTarget,
       valor_total: row.valor_total !== null ? String(row.valor_total) : "0",
@@ -540,34 +544,42 @@ export class PostgresBillingRepository implements BillingRepository {
     return result.rows[0] ?? null;
   }
 
-  private resolveDeliveryTarget(row: Pick<OrderRow, "telefone_cliente" | "telegram_chat_id" | "latest_channel">): DeliveryTarget {
-    const rawContact = row.telefone_cliente?.trim();
-    const latestChannel = row.latest_channel?.trim().toLowerCase();
-    const telegramChatId = row.telegram_chat_id?.trim() ?? this.resolveTelegramChatIdFallback(rawContact, latestChannel);
-    const phone = telegramChatId ? null : this.normalizePhone(rawContact);
-    if (telegramChatId) {
-      return {
-        available: true,
-        channel: "telegram",
-        displayTarget: `ID Telegram: ${telegramChatId}`,
-        telegramChatId,
-      };
+  private resolveDeliveryTarget(
+    row: Pick<OrderRow, "numeric_id" | "cliente_uuid" | "telegram_chat_id" | "latest_channel" | "latest_attendance_contact_id" | "latest_telegram_chat_id" | "latest_whatsapp_chat_id">,
+  ): DeliveryTarget {
+    const latestChannel = row.latest_channel?.trim().toLowerCase() ?? null;
+    const latestAttendanceContactId = row.latest_attendance_contact_id?.trim();
+    const latestTelegramChatId = row.latest_telegram_chat_id?.trim();
+    const explicitTelegramChatId = row.telegram_chat_id?.trim();
+
+    let result: DeliveryTarget;
+
+    if (latestChannel === "telegram") {
+      const telegramChatId =
+        latestTelegramChatId
+        ?? explicitTelegramChatId
+        ?? latestAttendanceContactId
+        ?? null;
+
+      if (telegramChatId) {
+        result = {
+          available: true,
+          channel: "telegram",
+          displayTarget: `ID Telegram: ${telegramChatId}`,
+          telegramChatId,
+        };
+        this.logResolvedDeliveryTarget(row, result);
+        return result;
+      }
     }
 
-    if (phone) {
-      return {
-        available: true,
-        channel: "whatsapp",
-        displayTarget: phone,
-        phone,
-      };
-    }
-
-    return {
+    result = {
       available: false,
-      reason: "Sem canal cadastrado. Cadastre um telefone ou chat do Telegram para liberar o envio.",
-      displayTarget: "Sem canal cadastrado",
+      reason: "Sem canal disponível",
+      displayTarget: "Sem canal disponível",
     };
+    this.logResolvedDeliveryTarget(row, result);
+    return result;
   }
 
   private async findOrCreateClient(client: PoolClient, nome: string, telefone: string, existingClientId?: string | null): Promise<string | null> {
@@ -620,38 +632,19 @@ export class PostgresBillingRepository implements BillingRepository {
     return rawValue.trim().toLowerCase() === "true";
   }
 
-  private normalizePhone(value?: string | null): string | null {
-    const digits = value?.replace(/\D/g, "") ?? "";
-    if (!digits) {
-      return null;
-    }
-
-    if (digits.startsWith("55") && digits.length >= 12) {
-      return digits;
-    }
-
-    if (digits.length === 10 || digits.length === 11) {
-      return `55${digits}`;
-    }
-
-    if (digits.length >= 8) {
-      return digits;
-    }
-
-    return null;
-  }
-
-  private resolveTelegramChatIdFallback(rawContact?: string | null, latestChannel?: string | null): string | null {
-    if (latestChannel !== "telegram" || !rawContact) {
-      return null;
-    }
-
-    const digits = rawContact.replace(/\D/g, "");
-    if (!digits || digits.length < 6) {
-      return null;
-    }
-
-    return digits;
+  private logResolvedDeliveryTarget(
+    row: Pick<OrderRow, "numeric_id" | "cliente_uuid" | "latest_channel" | "latest_telegram_chat_id" | "latest_whatsapp_chat_id">,
+    result: DeliveryTarget,
+  ): void {
+    console.info("[BillingChannelStrictResolve]", {
+      pedido_id: row.numeric_id,
+      cliente_id: row.cliente_uuid ?? null,
+      canal_ultimo_atendimento: row.latest_channel ?? null,
+      telegram_chat_id: row.latest_telegram_chat_id ?? null,
+      canal_final: result.channel ?? null,
+      telegramChatId_final: result.telegramChatId ?? null,
+      contatoExibicao_final: result.displayTarget,
+    });
   }
 }
 
