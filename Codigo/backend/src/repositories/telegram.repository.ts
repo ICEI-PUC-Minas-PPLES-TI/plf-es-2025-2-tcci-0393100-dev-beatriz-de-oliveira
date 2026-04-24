@@ -30,6 +30,7 @@ export interface SaveTelegramIncomingMessageInput {
 }
 
 export interface SaveTelegramOutgoingMessageInput {
+  atendimentoId?: number;
   chatId: string;
   text: string;
   type: "text" | "image";

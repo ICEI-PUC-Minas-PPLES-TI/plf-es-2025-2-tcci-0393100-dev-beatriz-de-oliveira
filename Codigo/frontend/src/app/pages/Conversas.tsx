@@ -11,7 +11,6 @@ import { Card } from "../components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-import { ScrollArea } from "../components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Skeleton } from "../components/ui/skeleton";
 import { Textarea } from "../components/ui/textarea";
@@ -239,13 +238,22 @@ function PreviousConversationCard({
 }
 
 function isValidChannelFilter(value: string | null): value is ConversationChannel {
-  return value === "whatsapp" || value === "telegram";
+  return value?.toLowerCase() === "whatsapp" || value?.toLowerCase() === "telegram";
+}
+
+function normalizeChannelFilter(value: string | null | undefined): ChannelFilter {
+  if (!value) {
+    return "todos";
+  }
+
+  const normalized = value.toLowerCase();
+  return isValidChannelFilter(normalized) ? normalized : "todos";
 }
 
 export function Conversas() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialChannel = searchParams.get("channel");
-  const [channelFilter, setChannelFilter] = useState<ChannelFilter>(isValidChannelFilter(initialChannel) ? initialChannel : "todos");
+  const initialChannel = normalizeChannelFilter(searchParams.get("channel"));
+  const [channelFilter, setChannelFilter] = useState<ChannelFilter>(initialChannel);
   const [statusFilter, setStatusFilter] = useState<AtendimentoStatus | "todos">("todos");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedConversationId, setSelectedConversationId] = useState<number | null>(null);
@@ -274,26 +282,23 @@ export function Conversas() {
   const { data: produtos } = useProdutosLookup(produtoSearch, isFinalizarModalOpen);
 
   useEffect(() => {
-    const queryChannel = searchParams.get("channel");
-    if (isValidChannelFilter(queryChannel) && queryChannel !== channelFilter) {
+    const queryChannel = normalizeChannelFilter(searchParams.get("channel"));
+    if (queryChannel !== channelFilter) {
       setChannelFilter(queryChannel);
-      return;
-    }
-
-    if (!queryChannel && channelFilter !== "todos") {
-      setChannelFilter("todos");
     }
   }, [channelFilter, searchParams]);
 
   const filteredConversations = useMemo(
     () =>
       conversations.filter((conversation) => {
+        const normalizedChannel = normalizeChannelFilter(conversation.channel);
         const haystack = [conversation.cliente, conversation.contactId ?? conversation.telefone, conversation.ultima_mensagem].join(" ").toLowerCase();
         const matchesSearch = haystack.includes(searchTerm.toLowerCase());
         const matchesStatus = statusFilter === "todos" || conversation.status === statusFilter;
-        return matchesSearch && matchesStatus;
+        const matchesChannel = channelFilter === "todos" || normalizedChannel === channelFilter;
+        return matchesSearch && matchesStatus && matchesChannel;
       }),
-    [conversations, searchTerm, statusFilter],
+    [channelFilter, conversations, searchTerm, statusFilter],
   );
 
   useEffect(() => {
@@ -377,16 +382,20 @@ export function Conversas() {
   };
 
   const updateChannelFilter = (nextFilter: ChannelFilter) => {
-    setChannelFilter(nextFilter);
+    const normalizedFilter = normalizeChannelFilter(nextFilter);
+    setChannelFilter(normalizedFilter);
     setStatusFilter("todos");
     setSelectedConversationId(null);
+    setShowPreviousConversations(false);
+    setExpandedPreviousConversationIds([]);
+    setSearchTerm("");
 
-    if (nextFilter === "todos") {
+    if (normalizedFilter === "todos") {
       setSearchParams({});
       return;
     }
 
-    setSearchParams({ channel: nextFilter });
+    setSearchParams({ channel: normalizedFilter });
   };
 
   const handleEnviarMensagem = async () => {
@@ -511,15 +520,22 @@ export function Conversas() {
   const ConversationChannelIcon = conversationVisual.icon;
 
   return (
-    <div className="flex h-[calc(100vh-8.5rem)] min-h-0 flex-col gap-6 overflow-hidden">
-      <div className="flex flex-col gap-2">
+    <div className="flex h-[calc(100vh-7rem)] min-h-0 flex-col gap-4 overflow-hidden">
+      <div className="hidden">
         <h2 className="text-2xl font-bold text-gray-900">Conversas</h2>
         <p className="text-muted-foreground">Painel único de atendimento para WhatsApp e Telegram, com visão operacional do atendimento.</p>
         {conversationsError && <p className="text-sm text-red-600">Erro ao carregar conversas: {conversationsError}</p>}
         {messagesError && <p className="text-sm text-red-600">Erro ao carregar mensagens: {messagesError}</p>}
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-6 overflow-hidden xl:grid-cols-[380px_minmax(0,1fr)]">
+      {(conversationsError || messagesError) && (
+        <div className="space-y-1">
+          {conversationsError && <p className="text-sm text-red-600">Erro ao carregar conversas: {conversationsError}</p>}
+          {messagesError && <p className="text-sm text-red-600">Erro ao carregar mensagens: {messagesError}</p>}
+        </div>
+      )}
+
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-hidden xl:grid-cols-[360px_minmax(0,1fr)]">
         <Card className="flex min-h-0 flex-col overflow-hidden shadow-md">
           <div className="space-y-3 border-b p-4">
             <div className="relative">
@@ -563,7 +579,7 @@ export function Conversas() {
             </Select>
           </div>
 
-          <ScrollArea className="min-h-0 flex-1">
+          <div className="min-h-0 flex-1 overflow-y-auto">
             {conversationsLoading ? (
               <ConversationListSkeleton />
             ) : filteredConversations.length === 0 ? (
@@ -626,7 +642,7 @@ export function Conversas() {
                 })}
               </div>
             )}
-          </ScrollArea>
+          </div>
         </Card>
 
         <Card className="flex min-h-0 flex-col overflow-hidden shadow-md">
@@ -765,7 +781,7 @@ export function Conversas() {
                         ) : previousConversations.length === 0 ? (
                           <p className="text-sm text-muted-foreground">Não há atendimentos anteriores para este cliente.</p>
                         ) : (
-                          <div className="space-y-3">
+                          <div className="max-h-72 space-y-3 overflow-y-auto pr-1">
                             {previousConversations.map((conversation) => (
                               <PreviousConversationCard
                                 key={conversation.id}
@@ -782,7 +798,7 @@ export function Conversas() {
                 </div>
               </div>
 
-              <ScrollArea className="min-h-0 flex-1 bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_100%)] p-4">
+              <div className="min-h-0 flex-1 overflow-y-auto bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_100%)] p-4">
                 {messagesLoading ? (
                   <MessageListSkeleton />
                 ) : messages.length === 0 ? (
@@ -795,9 +811,9 @@ export function Conversas() {
                     {messages.map((message) => <MessageBubble key={message.id} message={message} />)}
                   </div>
                 )}
-              </ScrollArea>
+              </div>
 
-              <div className="border-t bg-gray-50 p-4">
+              <div className="shrink-0 border-t bg-gray-50 p-4">
                 <div className="mb-2 text-xs text-muted-foreground">
                   {selectedConversation.status === "ENCERRADO"
                     ? "Conversa encerrada. Reabra o atendimento no fluxo operacional para voltar a interagir."

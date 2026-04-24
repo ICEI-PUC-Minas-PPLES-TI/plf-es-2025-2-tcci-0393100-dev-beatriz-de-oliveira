@@ -37,6 +37,17 @@ type PromotionPayload = Omit<Promocao, "id">;
 type OrderPayload = Omit<Pedido, "id">;
 let mockBillingRule: BillingRule = clone(BILLING_RULE);
 
+function normalizeConversationChannel(channel?: string): ConversationChannel {
+  return channel?.toUpperCase() === "TELEGRAM" || channel?.toLowerCase() === "telegram" ? "telegram" : "whatsapp";
+}
+
+function normalizeConversation(conversation: Atendimento): Atendimento {
+  return {
+    ...conversation,
+    channel: normalizeConversationChannel(conversation.channel),
+  };
+}
+
 const MOCK_DASHBOARD_SUMMARY: DashboardSummary = {
   pedidosPendentes: PEDIDOS.filter((pedido) => pedido.status === "PENDENTE").length,
   atendimentosAtivos: ATENDIMENTOS.filter((atendimento) => atendimento.status !== "ENCERRADO").length,
@@ -253,10 +264,10 @@ export const adminDataService = {
     (async () => {
       const query = new URLSearchParams();
       if (channel && channel !== "todos") {
-        query.set("channel", channel);
+        query.set("channel", normalizeConversationChannel(channel));
       }
       const suffix = query.toString() ? `?${query.toString()}` : "";
-      return (await httpClient.get<ApiListResponse<Atendimento>>(`${API_ENDPOINTS.conversations}${suffix}`)).data;
+      return (await httpClient.get<ApiListResponse<Atendimento>>(`${API_ENDPOINTS.conversations}${suffix}`)).data.map(normalizeConversation);
     })(),
 
   listConversationMessages: (conversationId: number) =>

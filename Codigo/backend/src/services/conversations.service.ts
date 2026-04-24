@@ -28,48 +28,75 @@ export class ConversationsService {
   }
 
   async sendMessage(conversationId: number, content: string) {
-    console.info("[ConversationsManualSend] start", {
-      conversationId,
-      preview: content.slice(0, 80),
-    });
-
-    const conversation = await this.repository.findConversationById(conversationId);
-    if (!conversation) {
-      throw new AppError("Conversation not found", 404, "CONVERSATION_NOT_FOUND");
-    }
-
-    console.info("[ConversationsManualSend] conversation_found", {
-      conversationId,
-      channel: conversation.channel,
-      status: conversation.status,
-      contactId: conversation.contactId ?? null,
-    });
-
-    if (conversation.channel === "telegram") {
-      const data = await this.telegramService.sendManualMessage({
-        atendimentoId: conversationId,
-        chatId: conversation.contactId ?? conversation.telefone,
-        texto: content,
-      });
-      console.info("[ConversationsManualSend] response_returned", {
+    try {
+      console.info("[ConversationsManualSend] inicio", {
         conversationId,
-        channel: "telegram",
+        preview: content.slice(0, 80),
+      });
+
+      const conversation = await this.repository.findConversationById(conversationId);
+      if (!conversation) {
+        throw new AppError("Conversation not found", 404, "CONVERSATION_NOT_FOUND");
+      }
+
+      console.info("[ConversationsManualSend] atendimento encontrado", {
+        conversationId,
+        status: conversation.status,
+        contactId: conversation.contactId ?? null,
+        phone: conversation.telefone ?? null,
+      });
+
+      const channel = conversation.channel === "telegram" ? "telegram" : "whatsapp";
+      console.info("[ConversationsManualSend] canal", {
+        conversationId,
+        channel,
+      });
+
+      const data =
+        channel === "telegram"
+          ? await this.telegramService.sendManualMessage({
+              atendimentoId: conversationId,
+              chatId: conversation.contactId ?? conversation.telefone,
+              texto: content,
+            })
+          : await this.whatsappService.sendManualMessage({
+              atendimentoId: conversationId,
+              telefone: conversation.telefone,
+              texto: content,
+            });
+
+      console.info("[ConversationsManualSend] envio OK", {
+        conversationId,
+        channel,
         messageId: data.id,
       });
-      return data;
-    }
+      console.info("[ConversationsManualSend] persistência OK", {
+        conversationId,
+        channel,
+        messageId: data.id,
+        sender: data.remetente ?? null,
+      });
+      console.info("[ConversationsManualSend] status OK", {
+        conversationId,
+        channel,
+        ultimaInteracaoEm: new Date().toISOString(),
+      });
+      console.info("[ConversationsManualSend] response OK", {
+        conversationId,
+        channel,
+        messageId: data.id,
+      });
 
-    const data = await this.whatsappService.sendManualMessage({
-      atendimentoId: conversationId,
-      telefone: conversation.telefone,
-      texto: content,
-    });
-    console.info("[ConversationsManualSend] response_returned", {
-      conversationId,
-      channel: "whatsapp",
-      messageId: data.id,
-    });
-    return data;
+      return data;
+    } catch (error) {
+      console.error("[ConversationsManualSend] erro completo", {
+        conversationId,
+        error: error instanceof Error ? error.message : "unknown_error",
+        stack: error instanceof Error ? error.stack : undefined,
+        code: typeof error === "object" && error !== null && "code" in error ? String((error as { code?: unknown }).code) : undefined,
+      });
+      throw error;
+    }
   }
 
   async updateStatus(conversationId: number, status: "ATIVO" | "PENDENTE" | "ENCERRADO") {

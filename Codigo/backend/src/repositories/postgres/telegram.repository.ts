@@ -117,12 +117,19 @@ export class PostgresTelegramRepository implements TelegramRepository {
 
     try {
       await client.query("BEGIN");
-      const conversation = await this.ensureConversation(client, input.chatId, undefined, {
-        status: input.status ?? "ATIVO",
-        handoffRequested: input.handoffRequested,
-        intent: input.intent,
-        stage: input.stage,
-      });
+      const conversation =
+        input.atendimentoId !== undefined
+          ? await this.findConversationIdentityById(client, input.atendimentoId)
+          : await this.ensureConversation(client, input.chatId, undefined, {
+              status: input.status ?? "ATIVO",
+              handoffRequested: input.handoffRequested,
+              intent: input.intent,
+              stage: input.stage,
+            });
+
+      if (!conversation) {
+        throw new Error("Conversation not found");
+      }
 
       const inserted = await client.query<MessageRow>(
         `
@@ -594,5 +601,38 @@ export class PostgresTelegramRepository implements TelegramRepository {
       `,
       [atendimentoUuid, options.status ?? null, options.handoffRequested, options.intent ?? null, options.stage ?? null],
     );
+  }
+
+  private async findConversationIdentityById(
+    client: PoolClient,
+    atendimentoId: number,
+  ): Promise<{ atendimentoUuid: string; numericId: number; chatId: string; customerName: string } | null> {
+    const result = await client.query<ConversationIdentityRow>(
+      `
+        SELECT
+          a.atendimento_id,
+          abs(hashtext(a.atendimento_id::text)) AS numeric_id,
+          a.whatsapp_chat_id AS chat_id,
+          c.nome AS cliente
+        FROM atendimentos a
+        LEFT JOIN clientes c ON c.cliente_id = a.cliente_id
+        WHERE a.canal = 'TELEGRAM'
+          AND abs(hashtext(a.atendimento_id::text)) = $1
+        LIMIT 1
+      `,
+      [atendimentoId],
+    );
+
+    const row = result.rows[0];
+    if (!row?.chat_id) {
+      return null;
+    }
+
+    return {
+      atendimentoUuid: row.atendimento_id,
+      numericId: Number(row.numeric_id),
+      chatId: row.chat_id,
+      customerName: row.cliente ?? "Cliente Telegram",
+    };
   }
 }

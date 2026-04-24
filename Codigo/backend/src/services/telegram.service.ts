@@ -268,6 +268,7 @@ export class TelegramService {
 
     try {
       const savedMessage = await this.sendTextMessage(chatId, input.texto, undefined, {
+        atendimentoId: input.atendimentoId,
         sender: "ATENDENTE",
         status: "PENDENTE",
         handoffRequested: true,
@@ -416,6 +417,7 @@ export class TelegramService {
     text: string,
     inlineKeyboard?: Array<Array<{ text: string; callbackData: string }>>,
     options?: {
+      atendimentoId?: number;
       sender?: "CHATBOT" | "ATENDENTE";
       status?: "ATIVO" | "PENDENTE" | "ENCERRADO";
       handoffRequested?: boolean;
@@ -456,6 +458,7 @@ export class TelegramService {
       });
 
       const savedMessage = await this.repository.saveOutgoingMessage({
+        atendimentoId: options?.atendimentoId,
         chatId,
         text,
         type: "text",
@@ -519,6 +522,7 @@ export class TelegramService {
     caption: string,
     inlineKeyboard?: Array<Array<{ text: string; callbackData: string }>>,
     options?: {
+      atendimentoId?: number;
       sender?: "CHATBOT" | "ATENDENTE";
       status?: "ATIVO" | "PENDENTE" | "ENCERRADO";
       handoffRequested?: boolean;
@@ -547,6 +551,7 @@ export class TelegramService {
       }
 
       const savedMessage = await this.repository.saveOutgoingMessage({
+        atendimentoId: options?.atendimentoId,
         chatId,
         text: caption,
         type: "image",
