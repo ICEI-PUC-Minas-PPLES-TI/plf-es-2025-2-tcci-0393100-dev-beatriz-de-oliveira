@@ -7,6 +7,8 @@ const CATEGORY_SYNONYMS: Record<string, string[]> = {
   "Eletrônicos": ["eletronico", "eletronicos", "eletrônica", "eletronica"],
 };
 
+const CATEGORY_CONNECTOR_WORDS = new Set(["e", "de", "da", "do", "das", "dos", "para", "com"]);
+
 function toSingular(value: string): string {
   if (value.endsWith("oes")) return `${value.slice(0, -3)}ao`;
   if (value.endsWith("aes")) return `${value.slice(0, -3)}ao`;
@@ -18,6 +20,19 @@ function toSingular(value: string): string {
 
 function unique(values: string[]): string[] {
   return Array.from(new Set(values));
+}
+
+function tokenizeCategory(value: string): string[] {
+  return unique(
+    normalizeMessageText(value)
+      .split(/[^a-z0-9]+/i)
+      .map((token) => toSingular(token.trim()))
+      .filter((token) => token.length > 1 && !CATEGORY_CONNECTOR_WORDS.has(token)),
+  );
+}
+
+function countTokenMatches(left: string[], right: string[]): number {
+  return left.filter((token) => right.includes(token)).length;
 }
 
 function buildCategoryAliases(categoryName: string): string[] {
@@ -58,6 +73,7 @@ export function resolveCategoryName(input: string, availableCategories: string[]
 } {
   const receivedCategory = input.trim();
   const normalizedCategory = toSingular(normalizeMessageText(receivedCategory));
+  const receivedTokens = tokenizeCategory(receivedCategory);
 
   if (!normalizedCategory) {
     return { receivedCategory, normalizedCategory };
@@ -65,7 +81,11 @@ export function resolveCategoryName(input: string, availableCategories: string[]
 
   const directMatch = availableCategories.find((category) => {
     const aliases = buildCategoryAliases(category);
-    return aliases.includes(normalizedCategory) || normalizedCategory.includes(normalizeMessageText(category));
+    return (
+      aliases.includes(normalizedCategory)
+      || normalizedCategory.includes(normalizeMessageText(category))
+      || normalizeMessageText(category).includes(normalizedCategory)
+    );
   });
 
   if (directMatch) {
@@ -86,6 +106,23 @@ export function resolveCategoryName(input: string, availableCategories: string[]
       receivedCategory,
       normalizedCategory,
       matchedCategory,
+    };
+  }
+
+  const tokenMatch = availableCategories
+    .map((category) => {
+      const categoryTokens = tokenizeCategory(category);
+      const matches = countTokenMatches(receivedTokens, categoryTokens);
+      return { category, matches };
+    })
+    .filter((item) => item.matches > 0)
+    .sort((left, right) => right.matches - left.matches || left.category.localeCompare(right.category, "pt-BR"))[0];
+
+  if (tokenMatch) {
+    return {
+      receivedCategory,
+      normalizedCategory,
+      matchedCategory: tokenMatch.category,
     };
   }
 

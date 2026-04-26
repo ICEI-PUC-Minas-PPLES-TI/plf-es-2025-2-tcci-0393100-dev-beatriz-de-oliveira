@@ -335,7 +335,10 @@ export class TelegramService {
     }
 
     const replyMessages = response.replyMessages?.filter((message) => message.trim()) ?? [];
-    if (replyMessages.length > 0) {
+    const shouldRenderProductCards =
+      response.intent === "products" && (response.stateTransition?.lastShownProducts?.length ?? 0) > 0;
+
+    if (replyMessages.length > 0 && !shouldRenderProductCards) {
       for (let index = 0; index < replyMessages.length; index += 1) {
         const isLastMessage = index === replyMessages.length - 1;
         await this.sendTextMessage(
