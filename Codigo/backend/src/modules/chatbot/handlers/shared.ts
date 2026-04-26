@@ -47,15 +47,19 @@ export function buildProductActionsKeyboard(productName: string) {
   ];
 }
 
-export function buildProductListKeyboard(productNames: string[]) {
+export function buildProductListKeyboard(
+  productNames: string[],
+  options?: { categoryName?: string; nextOffset?: number },
+) {
   const rows: Array<Array<{ text: string; callbackData: string }>> = [];
 
   productNames.slice(0, 3).forEach((productName, index) => {
-    rows.push([
-      { text: `Ver item ${index + 1}`, callbackData: `PRODUCT:MORE:${productName}` },
-      { text: `Interesse item ${index + 1}`, callbackData: `PRODUCT:INTEREST:${productName}` },
-    ]);
+    rows.push([{ text: `Ver item ${index + 1}`, callbackData: `PRODUCT:MORE:${productName}` }]);
   });
+
+  if (options?.categoryName && options.nextOffset !== undefined) {
+    rows.push([{ text: "Ver mais", callbackData: `CATEGORY_MORE:${options.categoryName}:${options.nextOffset}` }]);
+  }
 
   rows.push([{ text: "Falar com vendedor", callbackData: "MENU:HUMAN_HANDOFF" }]);
   return rows;

@@ -66,33 +66,45 @@ function buildProfileName(from?: { first_name?: string; last_name?: string; user
 }
 
 function mapCallbackDataToText(data?: string): string | null {
-  if (!data?.trim()) {
+  const trimmed = data?.trim();
+  if (!trimmed) {
     return null;
   }
 
-  if (data === "MENU:PRODUCTS") return "produtos";
-  if (data === "MENU:PROMOTIONS") return "promocoes";
-  if (data === "MENU:HUMAN_HANDOFF") return "falar com vendedor";
-  if (data === "HANDOFF:YES") return "sim";
-  if (data === "HANDOFF:NO") return "nao";
+  const normalized = trimmed.toLowerCase();
 
-  if (data.startsWith("CATEGORY:")) {
-    return `categoria ${data.slice("CATEGORY:".length).trim()}`;
+  if (normalized === "menu:products" || normalized === "menu:produtos") return "produtos";
+  if (normalized === "menu:promotions" || normalized === "menu:promocoes") return "promocoes";
+  if (normalized === "menu:human_handoff" || normalized === "menu:vendedor") return "falar com vendedor";
+  if (normalized === "handoff:yes" || normalized === "handoff:sim") return "sim";
+  if (normalized === "handoff:no" || normalized === "handoff:nao") return "nao";
+
+  const separatorIndex = trimmed.indexOf(":");
+  const action = separatorIndex >= 0 ? trimmed.slice(0, separatorIndex).trim().toLowerCase() : "";
+  const value = separatorIndex >= 0 ? trimmed.slice(separatorIndex + 1).trim() : "";
+
+  if (["category", "categoria", "products_category", "product_category"].includes(action) && value) {
+    return `categoria ${value}`;
   }
 
-  if (data.startsWith("PRODUCT:MORE:")) {
-    return `ver mais ${data.slice("PRODUCT:MORE:".length).trim()}`;
+  if (action === "category_more" && value) {
+    const [categoryName, offset] = value.split(":");
+    return `categoria ${categoryName?.trim() ?? ""} pagina ${offset?.trim() ?? ""}`.trim();
   }
 
-  if (data.startsWith("PRODUCT:INTEREST:")) {
-    return `tenho interesse em ${data.slice("PRODUCT:INTEREST:".length).trim()}`;
+  if (normalized.startsWith("product:more:")) {
+    return `ver mais ${trimmed.slice("PRODUCT:MORE:".length).trim()}`;
   }
 
-  if (data.startsWith("PRODUCT:SELLER:")) {
-    return `quero falar com vendedor sobre ${data.slice("PRODUCT:SELLER:".length).trim()}`;
+  if (normalized.startsWith("product:interest:")) {
+    return `tenho interesse em ${trimmed.slice("PRODUCT:INTEREST:".length).trim()}`;
   }
 
-  return data;
+  if (normalized.startsWith("product:seller:")) {
+    return `quero falar com vendedor sobre ${trimmed.slice("PRODUCT:SELLER:".length).trim()}`;
+  }
+
+  return trimmed;
 }
 
 export function parseTelegramUpdate(payload: TelegramWebhookPayload): TelegramParseResult {
@@ -111,6 +123,16 @@ export function parseTelegramUpdate(payload: TelegramWebhookPayload): TelegramPa
     const messageId = payload.callback_query.message?.message_id;
     const text = mapCallbackDataToText(payload.callback_query.data);
 
+    console.info("[TelegramCallback] recebido", {
+      callbackId: payload.callback_query.id,
+      chatId: chatId ? String(chatId) : null,
+      messageId: messageId ?? null,
+    });
+    console.info("[TelegramCallback] data", {
+      callbackId: payload.callback_query.id,
+      data: payload.callback_query.data ?? null,
+    });
+
     if (!chatId || !messageId) {
       return { kind: "invalid", reason: "missing_callback_chat_or_message_id" };
     }
@@ -118,6 +140,11 @@ export function parseTelegramUpdate(payload: TelegramWebhookPayload): TelegramPa
     if (!text) {
       return { kind: "ignored", reason: "empty_callback_data" };
     }
+
+    console.info("[TelegramCallback] convertido_para_texto", {
+      callbackId: payload.callback_query.id,
+      text,
+    });
 
     return {
       kind: "message",

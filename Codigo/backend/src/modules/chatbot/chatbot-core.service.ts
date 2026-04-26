@@ -421,18 +421,16 @@ export class ChatbotCoreService {
   ): ChatbotResponse {
     if (products.length === 1) {
       const product = products[0]!;
+      const replyText = [
+        "Encontrei este produto.",
+        `${product.nome}\n${toCurrency(product.preco)}\n${product.descricao.trim().slice(0, 120) || "Sem descricao no momento."}`,
+        buildCommercialHandoffText(),
+      ].join("\n\n");
       return {
         intent: "products",
         handler: "ProductSearchOverrideHandler",
-        replyText: [
-          "Encontrei este produto.",
-            `📺 ${product.nome}\n💰 ${toCurrency(product.preco)}\n${product.descricao.trim().slice(0, 120) || "Sem descrição no momento."}`,
-            buildCommercialHandoffText(),
-          ].join("\n\n"),
-          replyMessages: [
-            "Encontrei este produto 👇",
-            `📺 ${product.nome}\n💰 ${toCurrency(product.preco)}\n${product.descricao.trim().slice(0, 120) || "Sem descrição no momento."}`,
-          ],
+        replyText,
+        replyMessages: [replyText],
         actions: ["product_search_override", "product_found", "ask_human_handoff_confirmation"],
         handoffRequested: false,
         telegram: {
@@ -448,34 +446,30 @@ export class ChatbotCoreService {
       };
     }
 
+    const listedProducts = products.slice(0, 3);
+    const replyText = [
+      "Encontrei algumas opcoes.",
+      listedProducts
+        .map((product, index) => `${index + 1}) ${product.nome}\n${toCurrency(product.preco)}`)
+        .join("\n\n"),
+    ].join("\n\n");
+
     return {
       intent: "products",
       handler: "ProductSearchOverrideHandler",
-      replyText: [
-        "Encontrei algumas opções.",
-        products
-          .slice(0, 3)
-          .map((product, index) => `${index + 1}) 📺 ${product.nome}\n💰 ${toCurrency(product.preco)}`)
-          .join("\n\n"),
-      ].join("\n\n"),
-      replyMessages: [
-        "Encontrei algumas opções 👇",
-        products
-          .slice(0, 3)
-          .map((product, index) => `${index + 1}) 📺 ${product.nome}\n💰 ${toCurrency(product.preco)}`)
-          .join("\n\n"),
-      ],
+      replyText,
+      replyMessages: [replyText],
       actions: ["product_search_override", "product_list_found", "await_product_choice"],
       handoffRequested: false,
       telegram: {
-        inlineKeyboard: buildProductListKeyboard(products.slice(0, 3).map((product) => product.nome)),
+        inlineKeyboard: buildProductListKeyboard(listedProducts.map((product) => product.nome)),
         keyboardPrompt: "Escolha uma ação para continuar.",
       },
       stateTransition: {
         stage: "AGUARDANDO_ESCOLHA_PRODUTO",
         awaitingHumanHandoffDecision: false,
         awaitingProductSelectionForInterest: false,
-        lastShownProducts: products.slice(0, 3).map((product) => product.nome),
+        lastShownProducts: listedProducts.map((product) => product.nome),
         selectedProductName: undefined,
       },
     };
@@ -570,6 +564,21 @@ export class ChatbotCoreService {
     try {
       const normalized = normalizeIncomingMessage(message);
       const state = this.stateStore.getOrCreate(normalized.from);
+
+      this.logger.info(
+        {
+          event: "estado_atual",
+          phone: normalized.from,
+          stage: state.stage,
+          lastIntent: state.lastIntent,
+          awaitingHumanHandoffDecision: state.awaitingHumanHandoffDecision,
+          awaitingProductSelectionForInterest: state.awaitingProductSelectionForInterest,
+          lastSuggestedCategories: state.lastSuggestedCategories,
+          lastShownProducts: state.lastShownProducts,
+          incomingText: normalized.originalText,
+        },
+        "[ChatbotCore] estado_atual",
+      );
 
       if (state.stage === "ENCAMINHADO_HUMANO" || state.handoffRequested) {
         this.logger.info(

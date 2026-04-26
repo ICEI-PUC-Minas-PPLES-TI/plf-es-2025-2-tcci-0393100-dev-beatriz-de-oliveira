@@ -79,6 +79,9 @@ export class TelegramService {
     const message = parsed.message;
     if (parsed.callbackQueryId) {
       await this.answerCallbackQuery(parsed.callbackQueryId);
+      console.info("[TelegramCallback] answer_callback_query_ok", {
+        callbackId: parsed.callbackQueryId,
+      });
     }
     console.info("[TelegramService] normalized_payload", {
       chatId: message.from,
@@ -117,7 +120,15 @@ export class TelegramService {
         stage: runtimeState?.stage ?? "ENCAMINHADO_HUMANO",
       });
 
-      await this.leadStatusService.updateLeadStatusFromConversation(savedConversation.atendimentoId);
+      try {
+        await this.leadStatusService.updateLeadStatusFromConversation(savedConversation.atendimentoId);
+      } catch (error) {
+        console.error("[TelegramService] lead_status_sync_failed", {
+          chatId: message.from,
+          atendimentoId: savedConversation.atendimentoId,
+          ...formatErrorDetails(error),
+        });
+      }
 
       console.info("[TelegramService] inbound_suppressed_handoff", {
         chatId: message.from,
@@ -179,7 +190,15 @@ export class TelegramService {
       channel: "TELEGRAM",
     });
 
-    await this.leadStatusService.updateLeadStatusFromConversation(savedConversation.atendimentoId);
+    try {
+      await this.leadStatusService.updateLeadStatusFromConversation(savedConversation.atendimentoId);
+    } catch (error) {
+      console.error("[TelegramService] lead_status_sync_failed", {
+        chatId: message.from,
+        atendimentoId: savedConversation.atendimentoId,
+        ...formatErrorDetails(error),
+      });
+    }
 
     console.info("[Telegram] Webhook recebido", {
       chatId: message.from,
@@ -190,6 +209,14 @@ export class TelegramService {
     try {
       result = await this.chatbotCore.processIncomingMessages([message], payload as Record<string, unknown>);
     } catch (error) {
+      if (parsed.callbackQueryId) {
+        console.error("[TelegramCallback] erro completo", {
+          callbackId: parsed.callbackQueryId,
+          chatId: message.from,
+          messageId: message.messageId,
+          ...formatErrorDetails(error),
+        });
+      }
       console.error("[Telegram] Erro ao processar mensagem", {
         chatId: message.from,
         messageId: message.messageId,
@@ -224,12 +251,28 @@ export class TelegramService {
 
       try {
         await this.sendChatbotResponse(messageResult.phone, messageResult.response);
+        if (parsed.callbackQueryId) {
+          console.info("[TelegramCallback] resposta_enviada", {
+            callbackId: parsed.callbackQueryId,
+            chatId: messageResult.phone,
+            intent: messageResult.response.intent,
+            handler: messageResult.response.handler,
+          });
+        }
         console.info("[Telegram] Mensagem processada", {
           chatId: messageResult.phone,
           messageId: messageResult.messageId,
           intent: messageResult.response.intent,
         });
       } catch (error) {
+        if (parsed.callbackQueryId) {
+          console.error("[TelegramCallback] erro completo", {
+            callbackId: parsed.callbackQueryId,
+            chatId: messageResult.phone,
+            messageId: messageResult.messageId,
+            ...formatErrorDetails(error),
+          });
+        }
         console.error("[Telegram] Erro ao enviar mensagem", {
           chatId: messageResult.phone,
           messageId: messageResult.messageId,
@@ -336,7 +379,7 @@ export class TelegramService {
 
     const replyMessages = response.replyMessages?.filter((message) => message.trim()) ?? [];
     const shouldRenderProductCards =
-      response.intent === "products" && (response.stateTransition?.lastShownProducts?.length ?? 0) > 0;
+      response.intent === "products" && response.actions.includes("telegram_photo_card");
 
     if (replyMessages.length > 0 && !shouldRenderProductCards) {
       for (let index = 0; index < replyMessages.length; index += 1) {

@@ -4,6 +4,7 @@ import { normalizeMessageText } from "./message-normalizer.js";
 const CATEGORY_SYNONYMS: Record<string, string[]> = {
   TVs: ["tv", "tvs", "televisao", "televisoes", "televisor", "televisores"],
   Celulares: ["celular", "celulares", "smartphone", "smartphones"],
+  Eletronicos: ["eletronico", "eletronicos", "eletronica", "eletronicas"],
   "Eletrônicos": ["eletronico", "eletronicos", "eletrônica", "eletronica"],
 };
 
@@ -33,6 +34,10 @@ function tokenizeCategory(value: string): string[] {
 
 function countTokenMatches(left: string[], right: string[]): number {
   return left.filter((token) => right.includes(token)).length;
+}
+
+function compactCategory(value: string): string {
+  return tokenizeCategory(value).join("");
 }
 
 function buildCategoryAliases(categoryName: string): string[] {
@@ -81,10 +86,15 @@ export function resolveCategoryName(input: string, availableCategories: string[]
 
   const directMatch = availableCategories.find((category) => {
     const aliases = buildCategoryAliases(category);
+    const categoryNormalized = normalizeMessageText(category);
+    const categoryCompact = compactCategory(category);
+    const receivedCompact = compactCategory(receivedCategory);
     return (
       aliases.includes(normalizedCategory)
-      || normalizedCategory.includes(normalizeMessageText(category))
-      || normalizeMessageText(category).includes(normalizedCategory)
+      || normalizedCategory.includes(categoryNormalized)
+      || categoryNormalized.includes(normalizedCategory)
+      || (receivedCompact.length > 0 && categoryCompact.includes(receivedCompact))
+      || (categoryCompact.length > 0 && receivedCompact.includes(categoryCompact))
     );
   });
 
@@ -139,6 +149,6 @@ export function extractCategoryFromMessage(messageText: string, availableCategor
 } {
   const trimmed = messageText.trim();
   const prefixedMatch = trimmed.match(/^(?:categoria|cat)\s+(.+)$/i);
-  const candidate = prefixedMatch?.[1]?.trim() ?? trimmed;
+  const candidate = (prefixedMatch?.[1]?.trim() ?? trimmed).replace(/\s+pagina\s+\d+$/i, "").trim();
   return resolveCategoryName(candidate, availableCategories);
 }
