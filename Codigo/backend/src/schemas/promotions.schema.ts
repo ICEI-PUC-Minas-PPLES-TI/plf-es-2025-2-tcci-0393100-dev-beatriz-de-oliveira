@@ -8,6 +8,7 @@ export const promotionBodySchema = z.object({
   produto: z.string().min(1),
   produto_id: z.coerce.number().int().nonnegative(),
   tipo: z.enum(["PROMOCAO", "DESTAQUE"]),
+  desconto: z.coerce.string().default("0"),
   ativa: z.boolean(),
   inicio_em: z.string().min(1),
   fim_em: z.string().min(1),

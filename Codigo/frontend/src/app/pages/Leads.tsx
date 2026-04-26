@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { useLeadsData } from "../hooks/useAdminData";
 import { adminDataService } from "../services/adminDataService";
-import type { LeadStatus } from "../types/domain";
+import type { Lead, LeadStatus } from "../types/domain";
 import { isInDateRange } from "../utils/dateRange";
 
 export function Leads() {
@@ -26,6 +26,25 @@ export function Leads() {
 
   const getLeadStatus = (leadId: number, fallbackStatus: LeadStatus): LeadStatus =>
     statusByLeadId[leadId] ?? fallbackStatus;
+
+  const formatChannel = (lead: Lead) => {
+    if (lead.canal === "telegram") return "Telegram";
+    if (lead.canal === "whatsapp") return "WhatsApp";
+    return lead.origem ?? "Sem canal";
+  };
+
+  const formatDateTime = (value?: string) => {
+    if (!value) return "-";
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return parsed.toLocaleString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
 
   const handleStatusChange = async (leadId: number, newStatus: LeadStatus) => {
     try {
@@ -69,6 +88,10 @@ export function Leads() {
     const matchesSearch =
       lead.nome.toLowerCase().includes(searchTerm.toLowerCase())
       || lead.telefone.includes(searchTerm)
+      || (lead.contatoExibicao ?? lead.contato ?? "").toLowerCase().includes(searchTerm.toLowerCase())
+      || (lead.origem ?? "").toLowerCase().includes(searchTerm.toLowerCase())
+      || (lead.intencao ?? "").toLowerCase().includes(searchTerm.toLowerCase())
+      || (lead.interesse ?? "").toLowerCase().includes(searchTerm.toLowerCase())
       || lead.email.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "todos" || currentStatus === statusFilter;
     return matchesSearch && matchesStatus;
@@ -92,7 +115,7 @@ export function Leads() {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-muted-foreground" />
           <Input
-            placeholder="Buscar por nome ou telefone..."
+            placeholder="Buscar por nome, contato, canal ou interesse..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
@@ -150,9 +173,12 @@ export function Leads() {
               <TableHeader>
                 <TableRow className="bg-gray-50">
                   <TableHead>Nome</TableHead>
-                  <TableHead>Telefone</TableHead>
+                  <TableHead>Canal</TableHead>
+                  <TableHead>Contato</TableHead>
                   <TableHead>Interesse</TableHead>
-                  <TableHead>Data</TableHead>
+                  <TableHead>Origem / intenção</TableHead>
+                  <TableHead>Atendimento</TableHead>
+                  <TableHead>Última interação</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
@@ -161,11 +187,20 @@ export function Leads() {
                 {filteredLeads.map((lead) => (
                   <TableRow key={lead.id} className="hover:bg-gray-50">
                     <TableCell className="font-medium">{lead.nome}</TableCell>
-                    <TableCell>{lead.telefone}</TableCell>
+                    <TableCell>{formatChannel(lead)}</TableCell>
+                    <TableCell>{lead.contatoExibicao ?? lead.contato ?? lead.telefone}</TableCell>
                     <TableCell>
                       <span className="rounded bg-gray-100 px-2 py-1 text-sm">{lead.interesse}</span>
                     </TableCell>
-                    <TableCell className="text-sm">{new Date(lead.data_criacao).toLocaleDateString("pt-BR")}</TableCell>
+                    <TableCell className="text-sm">
+                      <div>{lead.origem ?? "-"}</div>
+                      <div className="text-muted-foreground">{lead.intencao ?? "-"}</div>
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {lead.atendimento_id ? `#${lead.atendimento_id}` : "-"}
+                      {lead.encaminhado_humano && <div className="text-xs text-purple-700">Encaminhado</div>}
+                    </TableCell>
+                    <TableCell className="text-sm">{formatDateTime(lead.ultima_interacao ?? lead.data_criacao)}</TableCell>
                     <TableCell>
                       <StatusBadge status={getLeadStatus(lead.id, lead.status)} />
                     </TableCell>

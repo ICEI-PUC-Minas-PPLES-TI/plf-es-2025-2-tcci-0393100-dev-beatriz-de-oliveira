@@ -1,6 +1,6 @@
-﻿import { useEffect, useMemo, useState } from "react";
+﻿import { type ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { Plus, Search, Edit, Trash2, Package } from "lucide-react";
+import { Download, Plus, Search, Edit, Trash2, Package, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "../components/EmptyState";
 import { ImageWithFallback } from "../components/ImageWithFallback";
@@ -21,10 +21,78 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { useProdutosData } from "../hooks/useAdminData";
 import { adminDataService } from "../services/adminDataService";
+import type { Produto } from "../types/domain";
+
+const PRODUCT_CSV_HEADERS = ["nome", "categoria", "descricao", "preco", "quantidade", "disponivel", "imagem"];
+
+function escapeCsvValue(value: unknown): string {
+  const text = String(value ?? "");
+  return /[",\n\r;]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function downloadCsv(filename: string, rows: unknown[][]): void {
+  const csv = rows.map((row) => row.map(escapeCsvValue).join(";")).join("\n");
+  const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function parseCsvLine(line: string, delimiter: ";" | ","): string[] {
+  const values: string[] = [];
+  let current = "";
+  let quoted = false;
+
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    const next = line[index + 1];
+
+    if (char === '"' && quoted && next === '"') {
+      current += '"';
+      index += 1;
+    } else if (char === '"') {
+      quoted = !quoted;
+    } else if (char === delimiter && !quoted) {
+      values.push(current.trim());
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+
+  values.push(current.trim());
+  return values;
+}
+
+function parseProductCsv(content: string): Array<Record<string, string>> {
+  const lines = content.split(/\r?\n/).filter((line) => line.trim().length > 0);
+  if (lines.length < 2) {
+    return [];
+  }
+
+  const headerLine = lines[0]!;
+  const delimiter = (headerLine.match(/;/g)?.length ?? 0) >= (headerLine.match(/,/g)?.length ?? 0) ? ";" : ",";
+  const headers = parseCsvLine(headerLine, delimiter).map((header) => header.trim().toLowerCase());
+  return lines.slice(1).map((line) => {
+    const values = parseCsvLine(line, delimiter);
+    return headers.reduce<Record<string, string>>((record, header, index) => {
+      record[header] = values[index] ?? "";
+      return record;
+    }, {});
+  });
+}
+
+function parseCsvBoolean(value: string): boolean {
+  return ["1", "true", "sim", "s", "yes", "disponivel", "disponível"].includes(value.trim().toLowerCase());
+}
 
 export function Produtos() {
   const { data: produtos, isLoading, error, reload } = useProdutosData();
   const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const pageSize = 20;
   const categorias = useMemo(() => Array.from(new Set(produtos.map((produto) => produto.categoria).filter(Boolean))), [produtos]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -60,6 +128,64 @@ export function Produtos() {
       toast.success("Disponibilidade atualizada");
     } catch (updateError) {
       const message = updateError instanceof Error ? updateError.message : "Falha ao atualizar disponibilidade";
+      toast.error(message);
+    }
+  };
+
+  const handleExportCsv = () => {
+    const rows = [
+      PRODUCT_CSV_HEADERS,
+      ...filteredProdutos.map((produto) => [
+        produto.nome,
+        produto.categoria,
+        produto.descricao,
+        produto.preco,
+        produto.quantidade ?? 0,
+        produto.disponivel ? "true" : "false",
+        produto.imagem,
+      ]),
+    ];
+
+    downloadCsv("produtos.csv", rows);
+    toast.success("CSV de produtos exportado");
+  };
+
+  const handleImportCsv = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    try {
+      const rows = parseProductCsv(await file.text());
+      if (rows.length === 0) {
+        toast.error("CSV vazio ou sem linhas de produto");
+        return;
+      }
+
+      const produtosCsv: Array<Omit<Produto, "id">> = rows.map((row) => ({
+        nome: row.nome?.trim() ?? "",
+        categoria: row.categoria?.trim() ?? "",
+        descricao: row.descricao?.trim() ?? "",
+        preco: row.preco?.trim() ?? "",
+        quantidade: Math.max(0, Number.parseInt(row.quantidade || "0", 10) || 0),
+        disponivel: parseCsvBoolean(row.disponivel ?? row.disponibilidade ?? "true"),
+        imagem: row.imagem?.trim() ?? "",
+      }));
+
+      const invalidRows = produtosCsv.filter((produto) => !produto.nome || !produto.categoria || !produto.descricao || !produto.preco || !produto.imagem);
+      if (invalidRows.length > 0) {
+        toast.error("CSV precisa conter nome, categoria, descricao, preco e imagem em todas as linhas");
+        return;
+      }
+
+      await Promise.all(produtosCsv.map((produto) => adminDataService.createProduto(produto)));
+      await reload();
+      toast.success(`${produtosCsv.length} produto(s) importado(s)`);
+    } catch (importError) {
+      const message = importError instanceof Error ? importError.message : "Falha ao importar CSV";
       toast.error(message);
     }
   };
@@ -117,12 +243,23 @@ export function Produtos() {
           <p className="mt-1 text-muted-foreground">Gerencie móveis e eletrodomésticos da loja</p>
           {error && <p className="mt-2 text-sm text-red-600">Erro ao carregar produtos: {error}</p>}
         </div>
-        <Link to="/produtos/novo">
-          <Button className="shadow-md">
-            <Plus className="mr-2 h-4 w-4" />
-            Novo Produto
+        <div className="flex flex-wrap gap-2">
+          <input ref={fileInputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleImportCsv} />
+          <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
+            <Upload className="mr-2 h-4 w-4" />
+            Importar CSV
           </Button>
-        </Link>
+          <Button type="button" variant="outline" onClick={handleExportCsv} disabled={filteredProdutos.length === 0}>
+            <Download className="mr-2 h-4 w-4" />
+            Exportar CSV
+          </Button>
+          <Link to="/produtos/novo">
+            <Button className="shadow-md">
+              <Plus className="mr-2 h-4 w-4" />
+              Novo Produto
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">

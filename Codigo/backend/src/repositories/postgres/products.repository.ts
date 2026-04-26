@@ -10,11 +10,13 @@ type ProductRow = {
   disponibilidade: boolean;
   categoria?: string | null;
   imagem?: string | null;
+  quantidade?: string | number | null;
 };
 
 type OptionalColumns = {
   categoria: boolean;
   imagem: boolean;
+  quantidade: boolean;
 };
 
 export class PostgresProductsRepository implements ProductsRepository {
@@ -139,7 +141,7 @@ export class PostgresProductsRepository implements ProductsRepository {
           AND table_name = 'produtos'
           AND column_name = ANY($1::text[])
       `,
-      [["categoria", "imagem"]],
+      [["categoria", "imagem", "quantidade"]],
     );
 
     const available = new Set(result.rows.map((row) => row.column_name));
@@ -147,6 +149,7 @@ export class PostgresProductsRepository implements ProductsRepository {
     return {
       categoria: available.has("categoria"),
       imagem: available.has("imagem"),
+      quantidade: available.has("quantidade"),
     };
   }
 
@@ -159,6 +162,7 @@ export class PostgresProductsRepository implements ProductsRepository {
       "disponibilidade",
       columns.categoria ? "categoria" : "NULL::text AS categoria",
       columns.imagem ? "imagem" : "NULL::text AS imagem",
+      columns.quantidade ? "quantidade" : "0::int AS quantidade",
     ];
 
     return parts.join(", ");
@@ -171,6 +175,7 @@ export class PostgresProductsRepository implements ProductsRepository {
       categoria: columns.categoria ? row.categoria ?? "Sem categoria" : "Sem categoria",
       descricao: row.descricao,
       preco: String(row.preco),
+      quantidade: Number(row.quantidade ?? 0),
       disponivel: Boolean(row.disponibilidade),
       imagem: columns.imagem ? row.imagem ?? "" : "",
     };
@@ -182,6 +187,7 @@ export class PostgresProductsRepository implements ProductsRepository {
     if (data.nome !== undefined) payload.nome = data.nome;
     if (data.descricao !== undefined) payload.descricao = data.descricao;
     if (data.preco !== undefined) payload.preco = data.preco;
+    if (columns.quantidade && data.quantidade !== undefined) payload.quantidade = data.quantidade;
     if (data.disponivel !== undefined) payload.disponibilidade = data.disponivel;
     if (columns.categoria && data.categoria !== undefined) payload.categoria = data.categoria;
     if (columns.imagem && data.imagem !== undefined) payload.imagem = data.imagem;

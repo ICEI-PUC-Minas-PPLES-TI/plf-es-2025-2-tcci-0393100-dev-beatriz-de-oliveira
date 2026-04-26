@@ -28,6 +28,8 @@ type OrderRow = {
   latest_telegram_chat_id: string | null;
   latest_whatsapp_chat_id: string | null;
   numero_pedido: string | null;
+  produto_id: number | null;
+  produto_nome: string | null;
   valor_total: string | number | null;
   forma_pagamento: string | null;
   status: DbPedidoStatus | null;
@@ -233,6 +235,14 @@ export class PostgresBillingRepository implements BillingRepository {
         [pedidoId, order.numero_pedido, order.telefone_cliente, order.data_vencimento],
       );
 
+      if (order.produto_id) {
+        await this.replaceOrderItem(client, pedidoId, order.produto_id, order.valor_total);
+      }
+
+      if (clientId) {
+        await this.markLeadConvertedForClient(client, clientId);
+      }
+
       await client.query("COMMIT");
       const created = await pool.query<OrderRow>(`${this.buildOrdersSelectQuery()} WHERE p.pedido_id = $1::uuid`, [pedidoId]);
       return this.mapOrderRow(created.rows[0]!);
@@ -310,6 +320,10 @@ export class PostgresBillingRepository implements BillingRepository {
           `UPDATE pedido_cobranca_meta SET ${metaUpdates.join(", ")} WHERE pedido_id = $${metaValues.length}::uuid`,
           metaValues,
         );
+      }
+
+      if (data.produto_id !== undefined || data.valor_total !== undefined) {
+        await this.replaceOrderItem(client, current.pedido_uuid, data.produto_id ?? current.produto_id ?? null, data.valor_total ?? current.valor_total ?? "0");
       }
 
       await client.query("COMMIT");
@@ -452,6 +466,8 @@ export class PostgresBillingRepository implements BillingRepository {
         CASE WHEN latest_attendance.canal = 'telegram' THEN latest_attendance.contact_id END AS latest_telegram_chat_id,
         CASE WHEN latest_attendance.canal = 'whatsapp' THEN latest_attendance.contact_id END AS latest_whatsapp_chat_id,
         m.numero_pedido,
+        order_product.produto_id,
+        order_product.produto_nome,
         p.valor_total,
         p.forma_pagamento,
         p.status,
@@ -467,6 +483,37 @@ export class PostgresBillingRepository implements BillingRepository {
       FROM pedidos p
       LEFT JOIN clientes c ON c.cliente_id = p.cliente_id
       LEFT JOIN pedido_cobranca_meta m ON m.pedido_id = p.pedido_id
+      LEFT JOIN LATERAL (
+        SELECT
+          pr.produto_id,
+          pr.nome AS produto_nome
+        FROM itens_pedido ip
+        JOIN produtos pr ON pr.produto_id = ip.produto_id
+        WHERE ip.pedido_id = p.pedido_id
+        ORDER BY ip.item_id ASC
+        LIMIT 1
+      ) item_product ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT pr.produto_id, pr.nome AS produto_nome
+        FROM produtos pr
+        WHERE item_product.produto_id IS NULL
+          AND pr.preco = p.valor_total
+        ORDER BY pr.disponibilidade DESC, pr.produto_id ASC
+        LIMIT 1
+      ) price_product ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT
+          COALESCE(item_product.produto_id, price_product.produto_id) AS produto_id,
+          COALESCE(
+            item_product.produto_nome,
+            price_product.produto_nome,
+            CASE
+              WHEN m.numero_pedido IS NOT NULL
+                AND m.numero_pedido !~ '^(ATD|WPP|PED)-[0-9]+$'
+              THEN m.numero_pedido
+            END
+          ) AS produto_nome
+      ) order_product ON TRUE
       LEFT JOIN LATERAL (
         SELECT
           lower(a.canal) AS canal,
@@ -495,6 +542,8 @@ export class PostgresBillingRepository implements BillingRepository {
     return {
       id: Number(row.numeric_id),
       numero_pedido: row.numero_pedido ?? `PED-${String(row.numeric_id).padStart(6, "0")}`,
+      produto_id: row.produto_id ?? undefined,
+      produto_nome: row.produto_nome ?? undefined,
       cliente: row.cliente_nome ?? "Cliente sem nome",
       telefone_cliente: row.telefone_cliente ?? "",
       telegramChatId: channelInfo.telegramChatId,
@@ -605,6 +654,36 @@ export class PostgresBillingRepository implements BillingRepository {
       [clientId, nome, telefone],
     );
     return clientId;
+  }
+
+  private async replaceOrderItem(client: PoolClient, pedidoId: string, produtoId: number | null, valorTotal: string | number): Promise<void> {
+    await client.query(`DELETE FROM itens_pedido WHERE pedido_id = $1::uuid`, [pedidoId]);
+
+    if (!produtoId) {
+      return;
+    }
+
+    await client.query(
+      `
+        INSERT INTO itens_pedido (pedido_id, produto_id, quantidade, preco_unitario, criado_em)
+        VALUES ($1::uuid, $2, 1, $3::numeric, NOW())
+      `,
+      [pedidoId, produtoId, valorTotal],
+    );
+  }
+
+  private async markLeadConvertedForClient(client: PoolClient, clientId: string): Promise<void> {
+    await client.query(
+      `
+        UPDATE leads l
+        SET status = 'CONVERTIDO',
+            atualizado_em = NOW()
+        FROM atendimentos a
+        WHERE a.lead_id = l.lead_id
+          AND a.cliente_id = $1::uuid
+      `,
+      [clientId],
+    );
   }
 
   private coerceDate(value?: string | null): string | null {

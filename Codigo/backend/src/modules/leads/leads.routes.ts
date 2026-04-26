@@ -11,6 +11,14 @@ const leadSchema = {
     interesse: { type: "string" },
     status: { type: "string" },
     data_criacao: { type: "string", format: "date-time" },
+    canal: { type: "string" },
+    contato: { type: "string" },
+    contatoExibicao: { type: "string" },
+    origem: { type: "string" },
+    intencao: { type: "string" },
+    ultima_interacao: { type: "string", format: "date-time" },
+    atendimento_id: { type: "number" },
+    encaminhado_humano: { type: "boolean" },
   },
 };
 

@@ -11,10 +11,9 @@ export class HumanHandoffHandler implements IntentHandler {
     const leadUpdate: LeadUpsertInput = {
       phone: context.message.from,
       name: context.message.profileName,
-      interest: context.selectedProductName
-        ? `Solicitou atendimento humano para o produto: ${context.selectedProductName}`
-        : "Solicitou atendimento humano no WhatsApp",
+      interest: context.selectedProductName ? `Interesse no produto: ${context.selectedProductName}` : undefined,
       status: "ENCAMINHADO_HUMANO",
+      channel: context.message.channel,
     };
 
     await this.leadsService.upsertByPhone(leadUpdate);

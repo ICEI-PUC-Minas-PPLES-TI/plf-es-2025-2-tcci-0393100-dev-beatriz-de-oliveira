@@ -3,8 +3,10 @@ import type { LeadFilters, Lead } from "../types/domain.js";
 export interface LeadUpsertByPhoneInput {
   phone: string;
   name?: string;
-  interest: string;
+  interest?: string;
   status: Lead["status"];
+  channel?: "whatsapp" | "telegram";
+  conversationId?: number;
 }
 
 export interface LeadsRepository {

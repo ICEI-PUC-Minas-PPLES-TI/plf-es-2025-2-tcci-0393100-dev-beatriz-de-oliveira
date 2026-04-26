@@ -133,6 +133,7 @@ function toIncomingChatbotMessage(
 ): WhatsAppIncomingMessage {
   return {
     from: message.from,
+    channel: "whatsapp",
     messageId: message.messageId,
     hasStableMessageId: message.hasStableMessageId,
     timestamp: message.timestamp,

@@ -61,6 +61,7 @@ export class LeadHandler implements IntentHandler {
       name: context.message.profileName,
       interest: interestText,
       status: "EM_CONTATO",
+      channel: context.message.channel,
     };
 
     await this.leadsService.upsertByPhone(leadUpdate);

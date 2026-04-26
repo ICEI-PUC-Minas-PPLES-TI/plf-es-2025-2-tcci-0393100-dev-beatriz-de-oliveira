@@ -478,6 +478,8 @@ export function Conversas() {
     try {
       await adminDataService.createPedido({
         numero_pedido: `ATD-${Date.now()}`,
+        produto_id: produtoSelecionado?.id,
+        produto_nome: produtoSelecionado?.nome,
         cliente: selectedConversation.cliente,
         telefone_cliente: selectedConversation.contactId ?? selectedConversation.telefone,
         valor_total: pedidoData.valor_total,

@@ -62,11 +62,31 @@ export class PostgresDashboardRepository implements DashboardRepository {
           ) AS pedidos_pendentes,
           (
             SELECT COUNT(*)::int
-            FROM atendimentos
-            WHERE canal = 'WHATSAPP'
-              AND status IN ('ATIVO', 'PENDENTE')
-              AND ($1::date IS NULL OR DATE(COALESCE(ultima_interacao_em, iniciado_em)) >= $1::date)
-              AND ($2::date IS NULL OR DATE(COALESCE(ultima_interacao_em, iniciado_em)) <= $2::date)
+            FROM (
+              SELECT
+                a.atendimento_id,
+                a.status,
+                COALESCE(a.ultima_interacao_em, a.iniciado_em) AS data_referencia,
+                row_number() OVER (
+                  PARTITION BY
+                    lower(a.canal),
+                    COALESCE(
+                      a.cliente_id::text,
+                      NULLIF(CASE
+                        WHEN upper(a.canal) = 'TELEGRAM' THEN a.telegram_chat_id
+                        WHEN upper(a.canal) = 'WHATSAPP' THEN a.whatsapp_chat_id
+                      END, ''),
+                      a.atendimento_id::text
+                    )
+                  ORDER BY COALESCE(a.ultima_interacao_em, a.iniciado_em) DESC NULLS LAST, a.atendimento_id DESC
+                ) AS row_rank
+              FROM atendimentos a
+              WHERE upper(COALESCE(a.canal, '')) IN ('WHATSAPP', 'TELEGRAM')
+            ) active_attendances
+            WHERE row_rank = 1
+              AND COALESCE(upper(status), 'ATIVO') IN ('ATIVO', 'PENDENTE')
+              AND ($1::date IS NULL OR DATE(data_referencia) >= $1::date)
+              AND ($2::date IS NULL OR DATE(data_referencia) <= $2::date)
           ) AS atendimentos_ativos,
           (SELECT COUNT(*)::int FROM produtos WHERE disponibilidade = TRUE) AS produtos_disponiveis,
           (
@@ -94,7 +114,7 @@ export class PostgresDashboardRepository implements DashboardRepository {
     const hasImageColumn = await this.hasImageColumn();
     const imageSelect = hasImageColumn ? "pr.imagem" : "NULL::text AS imagem";
     const imageGroupBy = hasImageColumn ? ", pr.imagem" : "";
-    const imageMax = hasImageColumn ? "MAX(pr.imagem)" : "NULL::text";
+    const metaImageSelect = hasImageColumn ? "COALESCE(MAX(named_pr.imagem), MAX(price_pr.imagem))" : "NULL::text";
 
     const result = await pool.query<TopProductRow>(
       `
@@ -119,22 +139,28 @@ export class PostgresDashboardRepository implements DashboardRepository {
         ),
         meta_sales AS (
           SELECT
-            m.numero_pedido AS produto,
-            COALESCE(MAX(pr.preco), AVG(fo.valor_total))::numeric AS preco,
-            ${imageMax} AS imagem,
+            COALESCE(named_pr.nome, price_pr.nome, 'Produto não identificado') AS produto,
+            COALESCE(MAX(named_pr.preco), MAX(price_pr.preco), AVG(fo.valor_total))::numeric AS preco,
+            ${metaImageSelect} AS imagem,
             COUNT(*)::int AS vendas,
             COALESCE(SUM(fo.valor_total), 0)::numeric AS receita
           FROM filtered_orders fo
           JOIN pedido_cobranca_meta m ON m.pedido_id = fo.pedido_id
-          LEFT JOIN produtos pr ON pr.nome = m.numero_pedido
-          WHERE m.numero_pedido IS NOT NULL
-            AND btrim(m.numero_pedido) <> ''
-            AND NOT EXISTS (
+          LEFT JOIN produtos named_pr ON named_pr.nome = m.numero_pedido
+          LEFT JOIN LATERAL (
+            SELECT pr.produto_id, pr.nome, pr.preco${hasImageColumn ? ", pr.imagem" : ""}
+            FROM produtos pr
+            WHERE named_pr.produto_id IS NULL
+              AND pr.preco = fo.valor_total
+            ORDER BY pr.disponibilidade DESC, pr.produto_id ASC
+            LIMIT 1
+          ) price_pr ON TRUE
+          WHERE NOT EXISTS (
               SELECT 1
               FROM itens_pedido ip
               WHERE ip.pedido_id = fo.pedido_id
             )
-          GROUP BY m.numero_pedido
+          GROUP BY COALESCE(named_pr.nome, price_pr.nome, 'Produto não identificado')
         ),
         combined AS (
           SELECT produto, preco, imagem, vendas, receita FROM item_sales
@@ -177,13 +203,13 @@ export class PostgresDashboardRepository implements DashboardRepository {
         FROM atendimentos a
         LEFT JOIN clientes c ON c.cliente_id = a.cliente_id
         LEFT JOIN LATERAL (
-          SELECT m.conteudo, m.data_envio
-          FROM mensagens m
-          WHERE m.atendimento_id = a.atendimento_id
-          ORDER BY m.data_envio DESC NULLS LAST, m.mensagem_id DESC
-          LIMIT 1
+            SELECT m.conteudo, m.data_envio
+            FROM mensagens m
+            WHERE m.atendimento_id = a.atendimento_id
+            ORDER BY m.xmin::text::bigint DESC, m.data_envio DESC NULLS LAST, m.mensagem_id DESC
+            LIMIT 1
         ) lm ON TRUE
-        WHERE a.canal = 'WHATSAPP'
+        WHERE upper(COALESCE(a.canal, '')) IN ('WHATSAPP', 'TELEGRAM')
           AND ($1::date IS NULL OR DATE(COALESCE(lm.data_envio, a.ultima_interacao_em, a.iniciado_em)) >= $1::date)
           AND ($2::date IS NULL OR DATE(COALESCE(lm.data_envio, a.ultima_interacao_em, a.iniciado_em)) <= $2::date)
         ORDER BY COALESCE(lm.data_envio, a.ultima_interacao_em, a.iniciado_em) DESC NULLS LAST

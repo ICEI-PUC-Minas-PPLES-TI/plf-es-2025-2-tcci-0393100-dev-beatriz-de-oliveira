@@ -124,6 +124,7 @@ export function parseTelegramUpdate(payload: TelegramWebhookPayload): TelegramPa
       callbackQueryId: payload.callback_query.id,
       message: {
         from: String(chatId),
+        channel: "telegram",
         messageId: `${String(chatId)}:callback:${String(messageId)}:${payload.callback_query.id}`,
         hasStableMessageId: true,
         timestamp: payload.callback_query.message?.date
@@ -174,6 +175,7 @@ export function parseTelegramUpdate(payload: TelegramWebhookPayload): TelegramPa
     kind: "message",
     message: {
       from: chatId,
+      channel: "telegram",
       messageId: dedupKey,
       hasStableMessageId: true,
       timestamp: payload.message.date ? new Date(payload.message.date * 1000).toISOString() : undefined,

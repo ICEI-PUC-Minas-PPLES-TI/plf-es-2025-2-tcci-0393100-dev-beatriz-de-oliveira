@@ -21,6 +21,8 @@ export const billingRoutineRunBodySchema = z.object({
 
 export const billingOrderSchema = z.object({
   numero_pedido: z.string().min(1),
+  produto_id: z.coerce.number().int().positive().optional(),
+  produto_nome: z.string().min(1).optional(),
   cliente: z.string().min(1),
   telefone_cliente: z.string().min(1),
   valor_total: z.string().min(1),

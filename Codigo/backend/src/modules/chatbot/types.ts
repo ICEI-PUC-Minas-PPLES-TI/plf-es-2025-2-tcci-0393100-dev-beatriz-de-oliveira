@@ -20,6 +20,7 @@ export type ConversationStage =
 
 export interface WhatsAppIncomingMessage {
   from: string;
+  channel?: "whatsapp" | "telegram";
   messageId: string;
   hasStableMessageId: boolean;
   timestamp?: string;
@@ -31,6 +32,7 @@ export interface WhatsAppIncomingMessage {
 
 export interface NormalizedIncomingMessage {
   from: string;
+  channel?: "whatsapp" | "telegram";
   messageId: string;
   timestamp?: string;
   originalText: string;
@@ -66,8 +68,9 @@ export interface ChatbotContext {
 export interface LeadUpsertInput {
   phone: string;
   name?: string;
-  interest: string;
+  interest?: string;
   status: LeadStatus;
+  channel?: "whatsapp" | "telegram";
 }
 
 export interface ChatbotResponse {

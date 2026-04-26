@@ -15,6 +15,7 @@ export function normalizeMessageText(text: string): string {
 export function normalizeIncomingMessage(message: WhatsAppIncomingMessage): NormalizedIncomingMessage {
   return {
     from: message.from,
+    channel: message.channel,
     messageId: message.messageId,
     timestamp: message.timestamp,
     originalText: collapseSpaces(message.text),

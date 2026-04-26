@@ -47,6 +47,8 @@ const billingOrderSchema = {
   properties: {
     id: { type: "number" },
     numero_pedido: { type: "string" },
+    produto_id: { type: "number" },
+    produto_nome: { type: "string" },
     cliente: { type: "string" },
     telefone_cliente: { type: "string" },
     telefone: { type: "string" },
@@ -71,6 +73,8 @@ const billingOrderBodySchema = {
   required: ["numero_pedido", "cliente", "telefone_cliente", "valor_total", "forma_pagamento", "status", "data_vencimento"],
   properties: {
     numero_pedido: { type: "string" },
+    produto_id: { type: "number" },
+    produto_nome: { type: "string" },
     cliente: { type: "string" },
     telefone_cliente: { type: "string" },
     valor_total: { type: "string" },

@@ -203,6 +203,8 @@ export function WhatsApp() {
     try {
       await adminDataService.createPedido({
         numero_pedido: `WPP-${Date.now()}`,
+        produto_id: produtoSelecionado?.id,
+        produto_nome: produtoSelecionado?.nome,
         cliente: selectedAtendimento?.cliente ?? "Cliente",
         telefone_cliente: selectedAtendimento?.telefone ?? "",
         valor_total: pedidoData.valor_total,

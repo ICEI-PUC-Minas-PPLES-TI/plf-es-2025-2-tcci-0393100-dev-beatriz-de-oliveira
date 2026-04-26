@@ -27,6 +27,7 @@ import type { Promocao, PromocaoTipo } from "../types/domain";
 interface PromocaoFormData {
   produto_id: string;
   tipo: PromocaoTipo;
+  desconto: string;
   ativa: boolean;
   inicio_em: string;
   fim_em: string;
@@ -35,10 +36,13 @@ interface PromocaoFormData {
 const EMPTY_FORM: PromocaoFormData = {
   produto_id: "",
   tipo: "PROMOCAO",
+  desconto: "0",
   ativa: true,
   inicio_em: "",
   fim_em: "",
 };
+
+type PromocaoStatus = "ativa" | "inativa" | "agendada";
 
 function formatDateOnly(value: string): string {
   const [year, month, day] = value.split("-");
@@ -47,6 +51,67 @@ function formatDateOnly(value: string): string {
   }
 
   return `${day}/${month}/${year}`;
+}
+
+function getTodayIso(): string {
+  const parts = new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const year = parts.find((part) => part.type === "year")?.value ?? "0000";
+  const month = parts.find((part) => part.type === "month")?.value ?? "00";
+  const day = parts.find((part) => part.type === "day")?.value ?? "00";
+
+  return `${year}-${month}-${day}`;
+}
+
+function getPromocaoStatus(promo: Pick<Promocao, "ativa" | "inicio_em" | "fim_em">): PromocaoStatus {
+  if (!promo.ativa) {
+    return "inativa";
+  }
+
+  const today = getTodayIso();
+  if (promo.inicio_em && promo.inicio_em > today) {
+    return "agendada";
+  }
+
+  if (promo.fim_em && promo.fim_em < today) {
+    return "inativa";
+  }
+
+  return "ativa";
+}
+
+function getPromocaoStatusLabel(status: PromocaoStatus): string {
+  if (status === "agendada") return "Agendada";
+  if (status === "ativa") return "Ativa";
+  return "Inativa";
+}
+
+function getPromocaoStatusClass(status: PromocaoStatus): string {
+  if (status === "agendada") return "bg-blue-500";
+  if (status === "ativa") return "bg-green-500";
+  return "bg-gray-500";
+}
+
+function normalizeDiscount(value: string): string {
+  const parsed = Number.parseFloat(value.replace(",", "."));
+  if (Number.isNaN(parsed)) {
+    return "0";
+  }
+
+  return Math.min(100, Math.max(0, parsed)).toString();
+}
+
+function formatDiscount(value: string): string {
+  const parsed = Number.parseFloat(value);
+  if (Number.isNaN(parsed)) {
+    return "0";
+  }
+
+  return parsed.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
 }
 
 export function Promocoes() {
@@ -67,7 +132,8 @@ export function Promocoes() {
     () =>
       promocoes.filter((promo) => {
         const matchesTipo = filtroTipo === "todos" || promo.tipo === filtroTipo;
-        const matchesAtiva = filtroAtiva === "todos" || (filtroAtiva === "ativa" ? promo.ativa : !promo.ativa);
+        const status = getPromocaoStatus(promo);
+        const matchesAtiva = filtroAtiva === "todos" || filtroAtiva === status;
         return matchesTipo && matchesAtiva;
       }),
     [filtroAtiva, filtroTipo, promocoes],
@@ -81,6 +147,7 @@ export function Promocoes() {
       setFormData({
         produto_id: promocao.produto_id.toString(),
         tipo: promocao.tipo,
+        desconto: promocao.desconto ?? "0",
         ativa: promocao.ativa,
         inicio_em: promocao.inicio_em,
         fim_em: promocao.fim_em,
@@ -107,11 +174,17 @@ export function Promocoes() {
       return;
     }
 
+    if (formData.fim_em < formData.inicio_em) {
+      toast.error("A data final deve ser igual ou posterior à data inicial");
+      return;
+    }
+
     const payload = {
       produto_id: produtoId,
       produto: produto.nome,
       imagem: produto.imagem,
       tipo: formData.tipo,
+      desconto: normalizeDiscount(formData.desconto),
       ativa: formData.ativa,
       inicio_em: formData.inicio_em,
       fim_em: formData.fim_em,
@@ -184,6 +257,7 @@ export function Promocoes() {
           <SelectContent>
             <SelectItem value="todos">Todos</SelectItem>
             <SelectItem value="ativa">Ativas</SelectItem>
+            <SelectItem value="agendada">Agendadas</SelectItem>
             <SelectItem value="inativa">Inativas</SelectItem>
           </SelectContent>
         </Select>
@@ -195,12 +269,15 @@ export function Promocoes() {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {filteredPromocoes.map((promo) => (
+          {filteredPromocoes.map((promo) => {
+            const status = getPromocaoStatus(promo);
+
+            return (
             <Card key={promo.id} className="overflow-hidden shadow-md transition-shadow hover:shadow-lg">
               <div className="relative">
                 <ImageWithFallback src={promo.imagem} alt={promo.produto} className="h-48 w-full object-cover" />
                 <div className="absolute top-3 right-3">
-                  <Badge className={promo.ativa ? "bg-green-500" : "bg-gray-500"}>{promo.ativa ? "Ativa" : "Inativa"}</Badge>
+                  <Badge className={getPromocaoStatusClass(status)}>{getPromocaoStatusLabel(status)}</Badge>
                 </div>
                 <div className="absolute top-3 left-3">
                   <Badge className={promo.tipo === "PROMOCAO" ? "bg-red-500" : "bg-yellow-500"}>
@@ -215,6 +292,10 @@ export function Promocoes() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
+                <div className="mb-4 flex items-center justify-between rounded-md bg-gray-50 px-3 py-2 text-sm">
+                  <span className="text-muted-foreground">Desconto</span>
+                  <span className="font-semibold text-primary">{formatDiscount(promo.desconto)}%</span>
+                </div>
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" onClick={() => handleOpenDialog(promo)} className="flex-1">
                     <Edit className="mr-2 h-4 w-4" />
@@ -226,7 +307,8 @@ export function Promocoes() {
                 </div>
               </CardContent>
             </Card>
-          ))}
+          );
+          })}
         </div>
       )}
 
@@ -280,6 +362,19 @@ export function Promocoes() {
                   <SelectItem value="DESTAQUE">Destaque</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="desconto">Desconto (%) *</Label>
+              <Input
+                id="desconto"
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={formData.desconto}
+                onChange={(event) => setFormData({ ...formData, desconto: event.target.value })}
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-4">

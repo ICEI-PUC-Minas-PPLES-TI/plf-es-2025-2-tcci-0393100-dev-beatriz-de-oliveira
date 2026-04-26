@@ -137,6 +137,7 @@ export class PostgresPromotionsRepository implements PromotionsRepository {
       produto_id: Number(row.produto_id ?? 0),
       produto: row.produto_nome ?? row.nome,
       tipo: row.tipo ?? "PROMOCAO",
+      desconto: String(row.desconto ?? 0),
       ativa: Boolean(row.ativo),
       inicio_em: this.formatDate(row.inicio_em),
       fim_em: this.formatDate(row.fim_em),
@@ -153,6 +154,7 @@ export class PostgresPromotionsRepository implements PromotionsRepository {
     }
     if (data.produto_id !== undefined) payload.produto_id = data.produto_id;
     if (data.tipo !== undefined) payload.tipo = data.tipo;
+    if (data.desconto !== undefined) payload.desconto = data.desconto || 0;
     if (data.ativa !== undefined) payload.ativo = data.ativa;
     if (data.inicio_em !== undefined) payload.inicio_em = data.inicio_em || null;
     if (data.fim_em !== undefined) payload.fim_em = data.fim_em || null;

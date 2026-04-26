@@ -91,19 +91,26 @@ export class PostgresMetricsRepository implements MetricsRepository {
         ),
         meta_sales AS (
           SELECT
-            m.numero_pedido AS produto,
+            COALESCE(named_pr.nome, price_pr.nome, 'Produto não identificado') AS produto,
             COUNT(*)::int AS vendas,
             COALESCE(SUM(fo.valor_total), 0)::numeric AS receita
           FROM filtered_orders fo
           JOIN pedido_cobranca_meta m ON m.pedido_id = fo.pedido_id
-          WHERE m.numero_pedido IS NOT NULL
-            AND btrim(m.numero_pedido) <> ''
-            AND NOT EXISTS (
+          LEFT JOIN produtos named_pr ON named_pr.nome = m.numero_pedido
+          LEFT JOIN LATERAL (
+            SELECT pr.produto_id, pr.nome
+            FROM produtos pr
+            WHERE named_pr.produto_id IS NULL
+              AND pr.preco = fo.valor_total
+            ORDER BY pr.disponibilidade DESC, pr.produto_id ASC
+            LIMIT 1
+          ) price_pr ON TRUE
+          WHERE NOT EXISTS (
               SELECT 1
               FROM itens_pedido ip
               WHERE ip.pedido_id = fo.pedido_id
             )
-          GROUP BY m.numero_pedido
+          GROUP BY COALESCE(named_pr.nome, price_pr.nome, 'Produto não identificado')
         ),
         combined AS (
           SELECT produto, vendas, receita FROM item_sales

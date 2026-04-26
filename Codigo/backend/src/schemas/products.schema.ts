@@ -5,6 +5,7 @@ export const productBodySchema = z.object({
   categoria: z.string().min(1),
   descricao: z.string().min(1),
   preco: z.string().min(1),
+  quantidade: z.coerce.number().int().nonnegative().default(0),
   disponivel: z.boolean(),
   imagem: z.string().url(),
 });

@@ -1,12 +1,29 @@
 ﻿import { useState } from "react";
 import type { DateRange } from "react-day-picker";
-import { TrendingUp, DollarSign, ShoppingCart, Users } from "lucide-react";
+import { Download, TrendingUp, DollarSign, ShoppingCart, Users } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
 import { DateRangePicker } from "../components/DateRangePicker";
 import { KPICard } from "../components/KPICard";
+import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { useMetricasData } from "../hooks/useAdminData";
+
+function escapeCsvValue(value: unknown): string {
+  const text = String(value ?? "");
+  return /[",\n\r;]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function downloadCsv(filename: string, rows: unknown[][]): void {
+  const csv = rows.map((row) => row.map(escapeCsvValue).join(";")).join("\n");
+  const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
 
 export function Metricas() {
   const [periodo, setPeriodo] = useState<DateRange | undefined>(undefined);
@@ -16,6 +33,18 @@ export function Metricas() {
   const totalVendas = metricas.vendasPorDia.reduce((acc, item) => acc + item.vendas, 0);
   const ticketMedio = totalVendas > 0 ? totalReceita / totalVendas : 0;
 
+  const handleExportCsv = () => {
+    downloadCsv("metricas.csv", [
+      ["secao", "indicador", "dia", "produto", "vendas", "receita", "valor"],
+      ["resumo", "receita_total", "", "", "", "", totalReceita],
+      ["resumo", "total_vendas", "", "", "", "", totalVendas],
+      ["resumo", "ticket_medio", "", "", "", "", ticketMedio],
+      ["resumo", "novos_clientes", "", "", "", "", metricas.novosClientes],
+      ...metricas.vendasPorDia.map((item) => ["vendas_por_dia", "", item.dia, "", item.vendas, item.receita, ""]),
+      ...metricas.topProdutos.map((produto) => ["top_produtos", "", "", produto.produto, produto.vendas, produto.receita, ""]),
+    ]);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
@@ -24,7 +53,13 @@ export function Metricas() {
           <p className="mt-1 text-muted-foreground">{"An\u00e1lise de desempenho e resultados"}</p>
           {error && <p className="mt-2 text-sm text-red-600">{"Erro ao carregar m\u00e9tricas: "}{error}</p>}
         </div>
-        <DateRangePicker value={periodo} onChange={setPeriodo} />
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" onClick={handleExportCsv} disabled={isLoading}>
+            <Download className="mr-2 h-4 w-4" />
+            Exportar CSV
+          </Button>
+          <DateRangePicker value={periodo} onChange={setPeriodo} />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">

@@ -222,6 +222,8 @@ export function Cobrancas() {
   const { data: produtos } = useProdutosLookup(produtoSearch, dialogOpen);
   const [editingPedidoId, setEditingPedidoId] = useState<number | null>(null);
   const [novoPedido, setNovoPedido] = useState({
+    numero_pedido: "",
+    produto_id: "",
     produto_nome: "",
     cliente: "",
     telefone_cliente: "",
@@ -261,6 +263,8 @@ export function Cobrancas() {
   const resetPedidoForm = () => {
     setProdutoSearch("");
     setNovoPedido({
+      numero_pedido: "",
+      produto_id: "",
       produto_nome: "",
       cliente: "",
       telefone_cliente: "",
@@ -273,6 +277,11 @@ export function Cobrancas() {
   };
 
   const handleSaveRegra = async () => {
+    if (!novoPedido.produto_id) {
+      toast.error("Selecione um produto cadastrado");
+      return;
+    }
+
     try {
       await adminDataService.saveBillingRule(regraCobranca);
       toast.success("Configuração de cobrança salva com sucesso");
@@ -305,7 +314,9 @@ export function Cobrancas() {
   const handleOpenEditPedido = (pedido: Pedido) => {
     setEditingPedidoId(pedido.id);
     setNovoPedido({
-      produto_nome: pedido.numero_pedido,
+      numero_pedido: pedido.numero_pedido,
+      produto_id: pedido.produto_id ? String(pedido.produto_id) : "",
+      produto_nome: pedido.produto_nome ?? pedido.numero_pedido,
       cliente: pedido.cliente,
       telefone_cliente: pedido.telefone_cliente,
       valor_total: pedido.valor_total,
@@ -313,7 +324,7 @@ export function Cobrancas() {
       status: pedido.status,
       data_vencimento: pedido.data_vencimento,
     });
-    setProdutoSearch(pedido.numero_pedido);
+    setProdutoSearch(pedido.produto_nome ?? pedido.numero_pedido);
     setDialogOpen(true);
   };
 
@@ -321,6 +332,7 @@ export function Cobrancas() {
     const produtoSelecionado = produtos.find((produto) => produto.nome === produtoNome);
     setNovoPedido((current) => ({
       ...current,
+      produto_id: produtoSelecionado ? String(produtoSelecionado.id) : "",
       produto_nome: produtoNome,
       valor_total: produtoSelecionado?.preco ?? current.valor_total,
     }));
@@ -336,7 +348,9 @@ export function Cobrancas() {
     try {
       if (editingPedidoId !== null) {
         await adminDataService.updatePedido(editingPedidoId, {
-          numero_pedido: novoPedido.produto_nome,
+          numero_pedido: novoPedido.numero_pedido || `PED-${Date.now()}`,
+          produto_id: novoPedido.produto_id ? Number(novoPedido.produto_id) : undefined,
+          produto_nome: novoPedido.produto_nome,
           cliente: novoPedido.cliente,
           telefone_cliente: novoPedido.telefone_cliente,
           valor_total: novoPedido.valor_total,
@@ -347,7 +361,9 @@ export function Cobrancas() {
         toast.success("Pedido atualizado com sucesso");
       } else {
         await adminDataService.createPedido({
-          numero_pedido: novoPedido.produto_nome,
+          numero_pedido: `PED-${Date.now()}`,
+          produto_id: novoPedido.produto_id ? Number(novoPedido.produto_id) : undefined,
+          produto_nome: novoPedido.produto_nome,
           cliente: novoPedido.cliente,
           telefone_cliente: novoPedido.telefone_cliente,
           valor_total: novoPedido.valor_total,
@@ -702,7 +718,7 @@ export function Cobrancas() {
                 <TableBody>
                   {pedidos.map((pedido) => (
                     <TableRow key={pedido.id} className="hover:bg-gray-50">
-                      <TableCell className="font-medium">{pedido.numero_pedido}</TableCell>
+                      <TableCell className="font-medium">{pedido.produto_nome ?? pedido.numero_pedido}</TableCell>
                       <TableCell className="font-medium">{pedido.cliente}</TableCell>
                       <TableCell>{pedido.telefone_cliente}</TableCell>
                       <TableCell className="font-semibold text-primary">{pedido.valor_total}</TableCell>

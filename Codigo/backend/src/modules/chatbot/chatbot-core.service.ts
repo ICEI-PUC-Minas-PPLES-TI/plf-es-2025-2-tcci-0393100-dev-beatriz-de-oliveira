@@ -302,8 +302,8 @@ export class ChatbotCoreService {
           ? `Interesse no produto: ${context.selectedProductName}`
           : buildInterestSummary(context.message.originalText)
         : context.selectedProductName
-          ? `Solicitou atendimento humano para o produto: ${context.selectedProductName}`
-          : "Solicitou atendimento humano no WhatsApp";
+          ? `Interesse no produto: ${context.selectedProductName}`
+          : undefined;
 
     return {
       intent: detectedIntent,
@@ -351,10 +351,9 @@ export class ChatbotCoreService {
         name: capturedName,
         interest:
           state.pendingInterestSummary ??
-          (state.selectedProductName
-            ? `Solicitou atendimento humano para o produto: ${state.selectedProductName}`
-            : "Solicitou atendimento humano no WhatsApp"),
+          (state.selectedProductName ? `Interesse no produto: ${state.selectedProductName}` : undefined),
         status: "ENCAMINHADO_HUMANO",
+        channel: context.message.channel,
       });
 
       return {
@@ -386,6 +385,7 @@ export class ChatbotCoreService {
         state.pendingInterestSummary ??
         (state.selectedProductName ? `Interesse no produto: ${state.selectedProductName}` : buildInterestSummary(context.message.originalText)),
       status: "EM_CONTATO",
+      channel: context.message.channel,
     });
 
     return {

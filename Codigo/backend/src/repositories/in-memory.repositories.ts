@@ -61,7 +61,7 @@ export class InMemoryLeadsRepository implements LeadsRepository {
       const updated: Lead = {
         ...current,
         nome: input.name || current.nome,
-        interesse: input.interest,
+        interesse: input.interest ?? current.interesse,
         status: input.status,
       };
       this.items[index] = updated;
@@ -74,7 +74,7 @@ export class InMemoryLeadsRepository implements LeadsRepository {
       nome: input.name || "Contato WhatsApp",
       telefone: input.phone,
       email: `lead.${digitsOnly || Date.now()}@whatsapp.local`,
-      interesse: input.interest,
+      interesse: input.interest ?? "",
       status: input.status,
       data_criacao: new Date().toISOString(),
     };

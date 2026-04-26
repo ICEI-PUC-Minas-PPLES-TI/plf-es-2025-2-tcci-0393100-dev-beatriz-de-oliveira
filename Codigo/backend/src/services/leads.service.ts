@@ -14,15 +14,20 @@ export class LeadsService {
   async exportCsv(filters?: LeadFilters): Promise<string> {
     const leads = await this.repository.findAll(filters);
     return buildCsv(
-      ["id", "nome", "telefone", "email", "interesse", "status", "data_criacao"],
+      ["id", "nome", "canal", "contato", "interesse", "status", "origem", "intencao", "atendimento_id", "encaminhado_humano", "data_criacao", "ultima_interacao"],
       leads.map((lead) => [
         String(lead.id),
         lead.nome,
-        lead.telefone,
-        lead.email,
+        lead.canal ?? "",
+        lead.contatoExibicao ?? lead.contato ?? lead.telefone,
         lead.interesse,
         lead.status,
+        lead.origem ?? "",
+        lead.intencao ?? "",
+        lead.atendimento_id ? String(lead.atendimento_id) : "",
+        lead.encaminhado_humano ? "sim" : "nao",
         lead.data_criacao,
+        lead.ultima_interacao ?? "",
       ]),
     );
   }

@@ -14,6 +14,7 @@ export interface Produto {
   categoria: string;
   descricao: string;
   preco: string;
+  quantidade: number;
   disponivel: boolean;
   imagem: string;
 }
@@ -26,6 +27,14 @@ export interface Lead {
   interesse: string;
   status: LeadStatus;
   data_criacao: string;
+  canal?: ConversationChannel;
+  contato?: string;
+  contatoExibicao?: string;
+  origem?: string;
+  intencao?: string;
+  ultima_interacao?: string;
+  atendimento_id?: number;
+  encaminhado_humano?: boolean;
 }
 
 export interface LeadFilters {
@@ -38,6 +47,7 @@ export interface Promocao {
   produto: string;
   produto_id: number;
   tipo: PromocaoTipo;
+  desconto: string;
   ativa: boolean;
   inicio_em: string;
   fim_em: string;
@@ -47,6 +57,8 @@ export interface Promocao {
 export interface Pedido {
   id: number;
   numero_pedido: string;
+  produto_id?: number;
+  produto_nome?: string;
   cliente: string;
   telefone_cliente: string;
   telefone?: string;
