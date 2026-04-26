@@ -6,6 +6,7 @@ import type { ChatbotContext, ChatbotResponse, IntentHandler } from "../types.js
 import {
   buildCategoryKeyboard,
   buildCategoryPromptText,
+  buildCategoryRefinementKeyboard,
   buildCommercialHandoffText,
   buildMainMenuKeyboard,
   buildProductActionsKeyboard,
@@ -41,6 +42,50 @@ function extractCategoryOffset(messageText: string): number {
   const match = messageText.match(/\spagina\s+(\d+)$/i);
   const offset = match?.[1] ? Number.parseInt(match[1], 10) : 0;
   return Number.isFinite(offset) && offset > 0 ? offset : 0;
+}
+
+function extractCategoryRefinement(messageText: string): { term?: string; general: boolean } {
+  const trimmed = messageText.trim();
+  const refineMatch = trimmed.match(/\s+busca\s+(.+)$/i);
+  if (refineMatch?.[1]?.trim()) {
+    return { term: refineMatch[1].trim(), general: false };
+  }
+
+  return { general: /\s+geral$/i.test(trimmed) || /\s+pagina\s+\d+$/i.test(trimmed) };
+}
+
+function getCategoryRefinementOptions(categoryName: string): string[] {
+  const normalized = normalizeMessageText(categoryName);
+
+  if (normalized.includes("eletronico")) {
+    return ["TVs", "Celulares", "Caixa de som", "Carregadores"];
+  }
+
+  if (normalized.includes("eletrodomestico")) {
+    return ["Geladeiras", "Fogoes", "Micro-ondas", "Lavadoras"];
+  }
+
+  if (normalized.includes("brinquedo")) {
+    return ["Bonecas", "Carrinhos", "Educativos", "Jogos"];
+  }
+
+  return [];
+}
+
+function productMatchesTerm(product: Produto, term: string): boolean {
+  const normalizedTermTokens = normalizeMessageText(term)
+    .split(/[^a-z0-9]+/i)
+    .map((token) => token.trim())
+    .filter((token) => token.length > 1);
+  const searchable = normalizeMessageText(`${product.nome} ${product.categoria ?? ""} ${product.descricao ?? ""}`);
+
+  return normalizedTermTokens.length > 0 && normalizedTermTokens.some((token) => {
+    const variants = new Set([token]);
+    if (token === "tvs") variants.add("tv");
+    if (token.endsWith("s") && token.length > 3) variants.add(token.slice(0, -1));
+    if (token.endsWith("es") && token.length > 4) variants.add(token.slice(0, -2));
+    return Array.from(variants).some((variant) => searchable.includes(variant));
+  });
 }
 
 export class ProductsHandler implements IntentHandler {
@@ -153,14 +198,44 @@ export class ProductsHandler implements IntentHandler {
       };
     }
 
-    const filteredProducts = available.filter(
+    const refinement = extractCategoryRefinement(context.message.originalText);
+    const refinementOptions = getCategoryRefinementOptions(categoryMatch.matchedCategory);
+
+    if (refinementOptions.length > 0 && !refinement.term && !refinement.general) {
+      const replyText = `Dentro de ${categoryMatch.matchedCategory}, o que voce procura?`;
+      return {
+        intent: this.intent,
+        handler: "ProductsHandlerRefinement",
+        replyText,
+        replyMessages: [replyText],
+        actions: ["ask_product_refinement"],
+        handoffRequested: false,
+        telegram: {
+          inlineKeyboard: buildCategoryRefinementKeyboard(categoryMatch.matchedCategory, refinementOptions),
+        },
+        stateTransition: {
+          stage: "AGUARDANDO_CATEGORIA",
+          awaitingProductSelectionForInterest: false,
+          lastShownProducts: [],
+          lastSuggestedCategories: categories,
+          selectedCategoryName: categoryMatch.matchedCategory,
+          selectedProductName: undefined,
+        },
+      };
+    }
+
+    const categoryProducts = available.filter(
       (product) => normalizeMessageText(product.categoria) === normalizeMessageText(categoryMatch.matchedCategory as string),
     );
+    const filteredProducts = refinement.term
+      ? categoryProducts.filter((product) => productMatchesTerm(product, refinement.term as string))
+      : categoryProducts;
 
     console.info("[ProductsHandler] produtos_encontrados", {
       receivedCategory: categoryMatch.receivedCategory,
       normalizedCategory: categoryMatch.normalizedCategory,
       foundCategory: categoryMatch.matchedCategory,
+      refinement: refinement.term ?? null,
       productCount: filteredProducts.length,
       products: filteredProducts.slice(0, 5).map((product) => product.nome),
     });
@@ -169,12 +244,12 @@ export class ProductsHandler implements IntentHandler {
       return {
         intent: this.intent,
         handler: "ProductsHandler",
-        replyText: `Nao encontrei produtos em ${categoryMatch.matchedCategory}.\nEscolha outra categoria`,
-        replyMessages: [`Nao encontrei produtos em ${categoryMatch.matchedCategory}.\nEscolha outra categoria`],
+        replyText: `Nao encontrei uma opcao boa para ${refinement.term ?? categoryMatch.matchedCategory}.\nPosso te conectar com um vendedor.`,
+        replyMessages: [`Nao encontrei uma opcao boa para ${refinement.term ?? categoryMatch.matchedCategory}.\nPosso te conectar com um vendedor.`],
         actions: ["category_without_products"],
         handoffRequested: false,
         telegram: {
-          inlineKeyboard: buildCategoryKeyboard(categories),
+          inlineKeyboard: [[{ text: "Falar com vendedor", callbackData: "MENU:HUMAN_HANDOFF" }]],
         },
         stateTransition: {
           stage: "AGUARDANDO_CATEGORIA",

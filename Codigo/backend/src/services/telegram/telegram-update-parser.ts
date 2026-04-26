@@ -87,9 +87,27 @@ function mapCallbackDataToText(data?: string): string | null {
     return `categoria ${value}`;
   }
 
+  if (action === "category_refine" && value) {
+    const [categoryName, term] = value.split(":");
+    return `categoria ${categoryName?.trim() ?? ""} busca ${term?.trim() ?? ""}`.trim();
+  }
+
+  if (action === "category_general" && value) {
+    return `categoria ${value} geral`;
+  }
+
   if (action === "category_more" && value) {
     const [categoryName, offset] = value.split(":");
     return `categoria ${categoryName?.trim() ?? ""} pagina ${offset?.trim() ?? ""}`.trim();
+  }
+
+  if (action === "search_refine" && value) {
+    const [baseTerm, refinement] = value.split(":");
+    return `quero ${baseTerm?.trim() ?? ""} ${refinement?.trim() ?? ""}`.trim();
+  }
+
+  if (action === "search_general" && value) {
+    return `quero ${value} opcoes gerais`;
   }
 
   if (normalized.startsWith("product:more:")) {

@@ -149,6 +149,10 @@ export function extractCategoryFromMessage(messageText: string, availableCategor
 } {
   const trimmed = messageText.trim();
   const prefixedMatch = trimmed.match(/^(?:categoria|cat)\s+(.+)$/i);
-  const candidate = (prefixedMatch?.[1]?.trim() ?? trimmed).replace(/\s+pagina\s+\d+$/i, "").trim();
+  const candidate = (prefixedMatch?.[1]?.trim() ?? trimmed)
+    .replace(/\s+pagina\s+\d+$/i, "")
+    .replace(/\s+busca\s+.+$/i, "")
+    .replace(/\s+geral$/i, "")
+    .trim();
   return resolveCategoryName(candidate, availableCategories);
 }

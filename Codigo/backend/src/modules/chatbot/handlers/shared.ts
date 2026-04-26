@@ -65,6 +65,26 @@ export function buildProductListKeyboard(
   return rows;
 }
 
+export function buildCategoryRefinementKeyboard(categoryName: string, options: string[]) {
+  const rows = options.slice(0, 4).map((option) => [
+    { text: option, callbackData: `CATEGORY_REFINE:${categoryName}:${option}` },
+  ]);
+
+  rows.push([{ text: "Ver opcoes gerais", callbackData: `CATEGORY_GENERAL:${categoryName}` }]);
+  rows.push([{ text: "Falar com vendedor", callbackData: "MENU:HUMAN_HANDOFF" }]);
+  return rows;
+}
+
+export function buildSearchRefinementKeyboard(baseTerm: string, options: string[]) {
+  const rows = options.slice(0, 4).map((option) => [
+    { text: option, callbackData: `SEARCH_REFINE:${baseTerm}:${option}` },
+  ]);
+
+  rows.push([{ text: "Ver opcoes gerais", callbackData: `SEARCH_GENERAL:${baseTerm}` }]);
+  rows.push([{ text: "Falar com vendedor", callbackData: "MENU:HUMAN_HANDOFF" }]);
+  return rows;
+}
+
 export function buildInterestSelectionKeyboard(productNames: string[]) {
   const rows = productNames.slice(0, 3).map((productName, index) => [
     {

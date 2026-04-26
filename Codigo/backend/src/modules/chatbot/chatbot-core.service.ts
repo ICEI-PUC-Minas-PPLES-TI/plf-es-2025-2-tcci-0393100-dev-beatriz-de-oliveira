@@ -14,6 +14,7 @@ import {
   buildHandoffKeyboard,
   buildProductActionsKeyboard,
   buildProductListKeyboard,
+  buildSearchRefinementKeyboard,
 } from "./handlers/shared.js";
 import { HumanHandoffHandler } from "./handlers/human-handoff.handler.js";
 import { LeadHandler } from "./handlers/lead.handler.js";
@@ -172,6 +173,21 @@ function toCurrency(value: string): string {
     return value;
   }
   return parsed.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function getBroadSearchTerm(normalizedText: string): string | null {
+  if (normalizedText.includes("opcoes gerais")) {
+    return null;
+  }
+
+  if (
+    (normalizedText.includes("caixa de som") || normalizedText.includes("caixa som"))
+    && !/(bluetooth|portatil|casa|barata|barato|potente|potencia)/i.test(normalizedText)
+  ) {
+    return "caixa de som";
+  }
+
+  return null;
 }
 
 function hasMeaningfulCustomerName(name?: string | null): boolean {
@@ -475,7 +491,53 @@ export class ChatbotCoreService {
     };
   }
 
+  private buildSearchRefinementResponse(baseTerm: string): ChatbotResponse {
+    const replyText =
+      baseTerm === "caixa de som"
+        ? "Voce procura caixa de som de qual tipo?"
+        : `O que voce procura em ${baseTerm}?`;
+
+    return {
+      intent: "products",
+      handler: "ProductSearchRefinementHandler",
+      replyText,
+      replyMessages: [replyText],
+      actions: ["ask_product_search_refinement"],
+      handoffRequested: false,
+      telegram: {
+        inlineKeyboard: buildSearchRefinementKeyboard(baseTerm, [
+          "Portatil/Bluetooth",
+          "Para casa",
+          "Mais barata",
+          "Mais potente",
+        ]),
+      },
+      stateTransition: {
+        stage: "AGUARDANDO_CATEGORIA",
+        awaitingHumanHandoffDecision: false,
+        awaitingProductSelectionForInterest: false,
+        lastShownProducts: [],
+        selectedCategoryName: baseTerm,
+        selectedProductName: undefined,
+      },
+    };
+  }
+
   private async tryProductSearchOverride(context: ChatbotContext): Promise<ChatbotResponse | null> {
+    const broadSearchTerm = getBroadSearchTerm(context.message.normalizedText);
+    if (broadSearchTerm) {
+      this.logger.info(
+        {
+          event: "product_search_refinement_requested",
+          phone: context.message.from,
+          originalText: context.message.originalText,
+          broadSearchTerm,
+        },
+        "[ChatbotProduct]",
+      );
+      return this.buildSearchRefinementResponse(broadSearchTerm);
+    }
+
     const productSearch = await findMatchingProducts(
       context.message.originalText,
       (input) => this.productsService.searchByName(input),
