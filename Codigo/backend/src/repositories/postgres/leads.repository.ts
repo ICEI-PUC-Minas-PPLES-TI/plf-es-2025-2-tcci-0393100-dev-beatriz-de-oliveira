@@ -53,7 +53,11 @@ function normalizeChannel(value?: string | null): ConversationChannel | undefine
 }
 
 export class PostgresLeadsRepository implements LeadsRepository {
+  private ensurePromise?: Promise<void>;
+
   async findAll(filters?: LeadFilters): Promise<Lead[]> {
+    await this.ensureSchema();
+
     const conditions: string[] = [];
     const values: unknown[] = [];
 
@@ -79,6 +83,8 @@ export class PostgresLeadsRepository implements LeadsRepository {
   }
 
   async findById(id: number): Promise<Lead | null> {
+    await this.ensureSchema();
+
     const query = `
       ${this.buildLeadSelectSql()}
       WHERE ${LEAD_ID_SQL.replaceAll("lead_id", "l.lead_id")} = $1
@@ -91,6 +97,8 @@ export class PostgresLeadsRepository implements LeadsRepository {
   }
 
   async create(data: Omit<Lead, "id">): Promise<Lead> {
+    await this.ensureSchema();
+
     const query = `
       INSERT INTO leads (nome, telefone, interesse_produto, status, origem, criado_em, atualizado_em)
       VALUES ($1, $2, $3, $4, $5, COALESCE($6::timestamp, NOW()), NOW())
@@ -112,6 +120,8 @@ export class PostgresLeadsRepository implements LeadsRepository {
   }
 
   async update(id: number, data: Partial<Omit<Lead, "id">>): Promise<Lead | null> {
+    await this.ensureSchema();
+
     const updates: string[] = [];
     const values: unknown[] = [];
 
@@ -127,7 +137,7 @@ export class PostgresLeadsRepository implements LeadsRepository {
 
     if (data.interesse !== undefined) {
       values.push(data.interesse);
-      updates.push(`interesse_produto = $${values.length}`);
+      updates.push(`interesse_produto = ${this.appendInterestSql(values.length)}`);
     }
 
     if (data.status !== undefined) {
@@ -161,6 +171,8 @@ export class PostgresLeadsRepository implements LeadsRepository {
   }
 
   async upsertByPhone(input: LeadUpsertByPhoneInput): Promise<Lead> {
+    await this.ensureSchema();
+
     const interest = this.normalizeCommercialInterest(input.interest);
     const existing = await pool.query<(LeadRow & { numeric_id: number })>(
       `
@@ -182,7 +194,7 @@ export class PostgresLeadsRepository implements LeadsRepository {
           SET
             nome = COALESCE($2, nome),
             telefone = $1,
-            interesse_produto = COALESCE($3, interesse_produto),
+            interesse_produto = ${this.appendInterestSql(3)},
             status = CASE
               WHEN status IN ('CONVERTIDO', 'ENCERRADO') AND $4 NOT IN ('CONVERTIDO', 'ENCERRADO') THEN status
               ELSE $4
@@ -306,6 +318,34 @@ export class PostgresLeadsRepository implements LeadsRepository {
     }
 
     return trimmed;
+  }
+
+  private appendInterestSql(valueIndex: number): string {
+    const value = `$${valueIndex}::text`;
+
+    return `
+      CASE
+        WHEN NULLIF(BTRIM(${value}), '') IS NULL THEN interesse_produto
+        WHEN interesse_produto IS NULL OR BTRIM(interesse_produto) = '' THEN BTRIM(${value})
+        WHEN EXISTS (
+          SELECT 1
+          FROM unnest(string_to_array(interesse_produto, ' | ')) AS interest_item(value)
+          WHERE LOWER(BTRIM(interest_item.value)) = LOWER(BTRIM(${value}))
+        ) THEN interesse_produto
+        ELSE concat_ws(' | ', interesse_produto, BTRIM(${value}))
+      END
+    `;
+  }
+
+  private async ensureSchema(): Promise<void> {
+    if (!this.ensurePromise) {
+      this.ensurePromise = pool.query(`
+        ALTER TABLE leads
+        ALTER COLUMN interesse_produto TYPE text
+      `).then(() => undefined);
+    }
+
+    return this.ensurePromise;
   }
 
   private buildContactDisplay(origin: string | null, contact: string): string {

@@ -13,6 +13,13 @@ import { adminDataService } from "../services/adminDataService";
 import type { Lead, LeadStatus } from "../types/domain";
 import { isInDateRange } from "../utils/dateRange";
 
+function splitInteresses(interesse?: string): string[] {
+  return (interesse ?? "")
+    .split("|")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 export function Leads() {
   const { data: leads, isLoading, error, reload } = useLeadsData();
   const [searchTerm, setSearchTerm] = useState("");
@@ -190,7 +197,11 @@ export function Leads() {
                     <TableCell>{formatChannel(lead)}</TableCell>
                     <TableCell>{lead.contatoExibicao ?? lead.contato ?? lead.telefone}</TableCell>
                     <TableCell>
-                      <span className="rounded bg-gray-100 px-2 py-1 text-sm">{lead.interesse}</span>
+                      <div className="flex max-w-md flex-wrap gap-1">
+                        {splitInteresses(lead.interesse).map((interesse) => (
+                          <span key={interesse} className="rounded bg-gray-100 px-2 py-1 text-sm">{interesse}</span>
+                        ))}
+                      </div>
                     </TableCell>
                     <TableCell className="text-sm">
                       <div>{lead.origem ?? "-"}</div>

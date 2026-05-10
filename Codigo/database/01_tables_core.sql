@@ -20,7 +20,7 @@ create table if not exists public.leads (
   lead_id uuid primary key default gen_random_uuid(),
   nome varchar(100),
   telefone varchar(20) not null unique,
-  interesse_produto varchar(150),
+  interesse_produto text,
   status varchar(50) not null default 'NOVO',
   origem varchar(50) not null default 'WHATSAPP',
   criado_em timestamp not null default now(),

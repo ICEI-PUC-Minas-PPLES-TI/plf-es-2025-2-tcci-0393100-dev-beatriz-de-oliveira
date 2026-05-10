@@ -16,6 +16,7 @@ create table if not exists public.pedidos (
   valor_total decimal(10,2) not null default 0,
   forma_pagamento varchar(50),
   status varchar(50) not null,
+  pago_em timestamp,
   criado_em timestamp not null default now(),
   atualizado_em timestamp not null default now()
 );

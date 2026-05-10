@@ -277,11 +277,6 @@ export function Cobrancas() {
   };
 
   const handleSaveRegra = async () => {
-    if (!novoPedido.produto_id) {
-      toast.error("Selecione um produto cadastrado");
-      return;
-    }
-
     try {
       await adminDataService.saveBillingRule(regraCobranca);
       toast.success("Configuração de cobrança salva com sucesso");

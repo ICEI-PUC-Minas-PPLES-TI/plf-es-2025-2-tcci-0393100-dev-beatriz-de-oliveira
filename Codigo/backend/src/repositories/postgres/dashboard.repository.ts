@@ -34,8 +34,11 @@ function formatPrice(value: string | number): string {
 
 export class PostgresDashboardRepository implements DashboardRepository {
   private hasImageColumnPromise?: Promise<boolean>;
+  private ensurePromise?: Promise<void>;
 
   async getSummary(filters: DashboardFilters = {}): Promise<DashboardSummary> {
+    await this.ensureSchema();
+
     const [counters, topProdutos, atendimentosRecentes] = await Promise.all([
       this.getCounters(filters),
       this.getTopProdutos(filters),
@@ -93,8 +96,8 @@ export class PostgresDashboardRepository implements DashboardRepository {
             SELECT COUNT(*)::int
             FROM pedidos
             WHERE status = 'CONCLUIDO'
-              AND ($1::date IS NULL OR DATE(COALESCE(criado_em, data_criacao)) >= $1::date)
-              AND ($2::date IS NULL OR DATE(COALESCE(criado_em, data_criacao)) <= $2::date)
+              AND ($1::date IS NULL OR DATE(COALESCE(pago_em, atualizado_em, criado_em, data_criacao)) >= $1::date)
+              AND ($2::date IS NULL OR DATE(COALESCE(pago_em, atualizado_em, criado_em, data_criacao)) <= $2::date)
           ) AS pedidos_periodo
       `,
       [filters.startDate ?? null, filters.endDate ?? null],
@@ -119,11 +122,11 @@ export class PostgresDashboardRepository implements DashboardRepository {
     const result = await pool.query<TopProductRow>(
       `
         WITH filtered_orders AS (
-          SELECT p.pedido_id, p.valor_total, COALESCE(p.criado_em, p.data_criacao) AS data_referencia
+          SELECT p.pedido_id, p.valor_total, COALESCE(p.pago_em, p.atualizado_em, p.criado_em, p.data_criacao) AS data_referencia
           FROM pedidos p
           WHERE p.status = 'CONCLUIDO'
-            AND ($1::date IS NULL OR DATE(COALESCE(p.criado_em, p.data_criacao)) >= $1::date)
-            AND ($2::date IS NULL OR DATE(COALESCE(p.criado_em, p.data_criacao)) <= $2::date)
+            AND ($1::date IS NULL OR DATE(COALESCE(p.pago_em, p.atualizado_em, p.criado_em, p.data_criacao)) >= $1::date)
+            AND ($2::date IS NULL OR DATE(COALESCE(p.pago_em, p.atualizado_em, p.criado_em, p.data_criacao)) <= $2::date)
         ),
         item_sales AS (
           SELECT
@@ -234,6 +237,26 @@ export class PostgresDashboardRepository implements DashboardRepository {
     return this.hasImageColumnPromise;
   }
 
+  private async ensureSchema(): Promise<void> {
+    if (!this.ensurePromise) {
+      this.ensurePromise = (async () => {
+        await pool.query(`
+          ALTER TABLE pedidos
+          ADD COLUMN IF NOT EXISTS pago_em timestamp without time zone
+        `);
+
+        await pool.query(`
+          UPDATE pedidos
+          SET pago_em = COALESCE(atualizado_em, criado_em, data_criacao)
+          WHERE status = 'CONCLUIDO'
+            AND pago_em IS NULL
+        `);
+      })();
+    }
+
+    return this.ensurePromise;
+  }
+
   private async loadImageColumn(): Promise<boolean> {
     const result = await pool.query<{ exists: boolean }>(`
       SELECT EXISTS (
@@ -248,7 +271,4 @@ export class PostgresDashboardRepository implements DashboardRepository {
     return Boolean(result.rows[0]?.exists);
   }
 }
-
-
-
 

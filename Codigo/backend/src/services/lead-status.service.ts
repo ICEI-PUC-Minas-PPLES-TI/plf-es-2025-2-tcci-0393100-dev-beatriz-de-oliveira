@@ -22,7 +22,11 @@ type ConversationLeadSyncRow = {
 type LeadStatusDb = "NOVO" | "INTERESSADO" | "ENCAMINHADO_HUMANO" | "CONVERTIDO" | "ENCERRADO";
 
 export class LeadStatusService {
+  private ensurePromise?: Promise<void>;
+
   async updateLeadStatusFromConversation(conversationId: number): Promise<void> {
+    await this.ensureSchema();
+
     const result = await pool.query<ConversationLeadSyncRow>(
       `
         SELECT
@@ -84,7 +88,16 @@ export class LeadStatusService {
           UPDATE leads
           SET nome = COALESCE($2, nome),
               telefone = $3,
-              interesse_produto = COALESCE(NULLIF($4::varchar, ''), interesse_produto),
+              interesse_produto = CASE
+                WHEN NULLIF(BTRIM($4::text), '') IS NULL THEN interesse_produto
+                WHEN interesse_produto IS NULL OR BTRIM(interesse_produto) = '' THEN BTRIM($4::text)
+                WHEN EXISTS (
+                  SELECT 1
+                  FROM unnest(string_to_array(interesse_produto, ' | ')) AS interest_item(value)
+                  WHERE LOWER(BTRIM(interest_item.value)) = LOWER(BTRIM($4::text))
+                ) THEN interesse_produto
+                ELSE concat_ws(' | ', interesse_produto, BTRIM($4::text))
+              END,
               status = CASE
                 WHEN status IN ('CONVERTIDO', 'ENCERRADO') AND $5 NOT IN ('CONVERTIDO', 'ENCERRADO') THEN status
                 ELSE $5
@@ -190,5 +203,16 @@ export class LeadStatusService {
       `,
       [atendimentoId, leadId],
     );
+  }
+
+  private async ensureSchema(): Promise<void> {
+    if (!this.ensurePromise) {
+      this.ensurePromise = pool.query(`
+        ALTER TABLE leads
+        ALTER COLUMN interesse_produto TYPE text
+      `).then(() => undefined);
+    }
+
+    return this.ensurePromise;
   }
 }

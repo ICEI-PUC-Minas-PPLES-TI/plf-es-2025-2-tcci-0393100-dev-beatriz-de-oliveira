@@ -35,6 +35,7 @@ type OrderRow = {
   status: DbPedidoStatus | null;
   data_vencimento: string | null;
   data_criacao: string | null;
+  pago_em: string | null;
   criado_em: string | null;
   atualizado_em: string | null;
   billing_send_status: string | null;
@@ -221,10 +222,10 @@ export class PostgresBillingRepository implements BillingRepository {
 
       await client.query(
         `
-          INSERT INTO pedidos (pedido_id, cliente_id, data_criacao, valor_total, forma_pagamento, status, criado_em, atualizado_em)
-          VALUES ($1::uuid, $2::uuid, NOW(), $3::numeric, $4, $5, NOW(), NOW())
+          INSERT INTO pedidos (pedido_id, cliente_id, data_criacao, valor_total, forma_pagamento, status, pago_em, criado_em, atualizado_em)
+          VALUES ($1::uuid, $2::uuid, NOW(), $3::numeric, $4, $5, $6, NOW(), NOW())
         `,
-        [pedidoId, clientId, order.valor_total, order.forma_pagamento, mapDomainStatusToDb(order.status)],
+        [pedidoId, clientId, order.valor_total, order.forma_pagamento, mapDomainStatusToDb(order.status), order.status === "PAGO" ? new Date() : null],
       );
 
       await client.query(
@@ -281,8 +282,14 @@ export class PostgresBillingRepository implements BillingRepository {
         pedidoUpdates.push(`forma_pagamento = $${pedidoValues.length}`);
       }
       if (data.status !== undefined) {
-        pedidoValues.push(mapDomainStatusToDb(data.status));
+        const nextStatus = mapDomainStatusToDb(data.status);
+        pedidoValues.push(nextStatus);
         pedidoUpdates.push(`status = $${pedidoValues.length}`);
+        if (nextStatus === "CONCLUIDO") {
+          pedidoUpdates.push(current.status === "CONCLUIDO" ? "pago_em = COALESCE(pago_em, NOW())" : "pago_em = NOW()");
+        } else {
+          pedidoUpdates.push("pago_em = NULL");
+        }
       }
       if (clientId !== current.cliente_uuid) {
         pedidoValues.push(clientId);
@@ -415,6 +422,18 @@ export class PostgresBillingRepository implements BillingRepository {
 
   private async createSupportTables(): Promise<void> {
     await pool.query(`
+      ALTER TABLE pedidos
+      ADD COLUMN IF NOT EXISTS pago_em timestamp without time zone
+    `);
+
+    await pool.query(`
+      UPDATE pedidos
+      SET pago_em = COALESCE(atualizado_em, criado_em, data_criacao)
+      WHERE status = 'CONCLUIDO'
+        AND pago_em IS NULL
+    `);
+
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS pedido_cobranca_meta (
         pedido_id uuid PRIMARY KEY REFERENCES pedidos(pedido_id) ON DELETE CASCADE,
         numero_pedido varchar(100) NOT NULL,
@@ -473,6 +492,7 @@ export class PostgresBillingRepository implements BillingRepository {
         p.status,
         m.data_vencimento::text AS data_vencimento,
         p.data_criacao,
+        p.pago_em,
         p.criado_em,
         p.atualizado_em,
         latest_send.status AS billing_send_status,
@@ -718,4 +738,3 @@ export class PostgresBillingRepository implements BillingRepository {
     });
   }
 }
-
