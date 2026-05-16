@@ -269,7 +269,7 @@ export class ChatbotCoreService {
       new GreetingHandler(),
       new MenuHandler(),
       new ProductsHandler(dependencies.productsService),
-      new PromotionsHandler(dependencies.promotionsService),
+      new PromotionsHandler(dependencies.promotionsService, dependencies.productsService, dependencies.leadsService),
       new LeadHandler(dependencies.leadsService),
       new HumanHandoffHandler(dependencies.leadsService),
       new UnknownHandler(),

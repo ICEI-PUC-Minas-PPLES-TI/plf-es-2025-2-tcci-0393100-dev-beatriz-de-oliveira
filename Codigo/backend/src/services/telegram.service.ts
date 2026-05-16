@@ -418,7 +418,8 @@ export class TelegramService {
 
     const replyMessages = response.replyMessages?.filter((message) => message.trim()) ?? [];
     const shouldRenderProductCards =
-      response.intent === "products" && (response.actions.includes("product_details") || response.actions.includes("product_gallery"));
+      response.intent === "products"
+      && response.actions.some((action) => ["product_details", "product_gallery", "product_found", "product_search_override"].includes(action));
 
     if (replyMessages.length > 0 && !shouldRenderProductCards) {
       for (let index = 0; index < replyMessages.length; index += 1) {
@@ -446,8 +447,15 @@ export class TelegramService {
       return;
     }
 
-    if (prepared.introText && !response.actions.includes("product_gallery")) {
-      await this.sendTextMessage(chatId, prepared.introText, undefined, deliveryState);
+    const introText =
+      prepared.introText
+      && !response.actions.includes("product_gallery")
+      && !(shouldRenderProductCards && prepared.productCards.length === 1)
+        ? prepared.introText
+        : undefined;
+
+    if (introText) {
+      await this.sendTextMessage(chatId, introText, undefined, deliveryState);
       console.info("[Telegram] Resposta enviada em texto", {
         chatId,
         intent: response.intent,
