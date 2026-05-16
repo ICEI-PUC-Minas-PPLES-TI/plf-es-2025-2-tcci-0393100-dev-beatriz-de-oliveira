@@ -23,6 +23,8 @@ export class ConversationStateStore {
       awaitingProductSelectionForInterest: false,
       lastShownProducts: [],
       lastSuggestedCategories: [],
+      recentPromotions: [],
+      awaitingPromotionPriceQuery: false,
     };
     this.states.set(phoneNumber, initial);
     return initial;
@@ -44,6 +46,9 @@ export class ConversationStateStore {
           | "lastSuggestedCategories"
           | "selectedProductName"
           | "selectedCategoryName"
+          | "recentPromotions"
+          | "selectedPromotionProduct"
+          | "awaitingPromotionPriceQuery"
           | "pendingIntentAfterName"
           | "pendingInterestSummary"
         >
@@ -72,6 +77,9 @@ export class ConversationStateStore {
       lastShownProducts: [],
       lastSuggestedCategories: [],
       selectedCategoryName: undefined,
+      recentPromotions: [],
+      selectedPromotionProduct: undefined,
+      awaitingPromotionPriceQuery: false,
       pendingIntentAfterName: undefined,
       pendingInterestSummary: undefined,
       lastMessageAt: now,
@@ -92,6 +100,9 @@ export class ConversationStateStore {
       lastSuggestedCategories: [],
       selectedProductName: undefined,
       selectedCategoryName: undefined,
+      recentPromotions: [],
+      selectedPromotionProduct: undefined,
+      awaitingPromotionPriceQuery: false,
       pendingIntentAfterName: undefined,
       pendingInterestSummary: undefined,
       lastMessageAt: now,

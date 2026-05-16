@@ -53,6 +53,9 @@ export interface ChatbotConversationState {
   lastSuggestedCategories: string[];
   selectedProductName?: string;
   selectedCategoryName?: string;
+  recentPromotions: string[];
+  selectedPromotionProduct?: string;
+  awaitingPromotionPriceQuery: boolean;
   pendingIntentAfterName?: Extract<ChatbotIntent, "lead_interest" | "human_handoff">;
   pendingInterestSummary?: string;
 }
@@ -97,6 +100,9 @@ export interface ChatbotResponse {
       | "lastSuggestedCategories"
       | "selectedProductName"
       | "selectedCategoryName"
+      | "recentPromotions"
+      | "selectedPromotionProduct"
+      | "awaitingPromotionPriceQuery"
       | "pendingIntentAfterName"
       | "pendingInterestSummary"
     >

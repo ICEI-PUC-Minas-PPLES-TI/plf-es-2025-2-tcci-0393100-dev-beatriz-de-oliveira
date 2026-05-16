@@ -31,6 +31,7 @@ const PRODUCTS_KEYWORDS = [
   "tem ",
 ];
 const PROMOTIONS_KEYWORDS = ["promocao", "promocoes", "oferta", "ofertas", "desconto", "descontos"];
+const PRICE_QUERY_KEYWORDS = ["qual preco", "qual o preco", "qual valor", "qual o valor", "quanto custa", "valor do", "valor da", "preco do", "preco da"];
 const LEAD_INTEREST_KEYWORDS = [
   "tenho interesse",
   "gostei",
@@ -104,6 +105,15 @@ export function detectIntent(normalizedText: string, state: ChatbotConversationS
   if (state.awaitingHumanHandoffDecision) {
     if (isAffirmativeMessage(normalizedText)) return "human_handoff";
     if (isNegativeMessage(normalizedText)) return "menu";
+  }
+
+  const isPriceQuery = hasAnyKeyword(normalizedText, PRICE_QUERY_KEYWORDS);
+  if (state.awaitingPromotionPriceQuery) {
+    return "promotions";
+  }
+
+  if ((state.awaitingPromotionPriceQuery || state.recentPromotions.length > 0) && isPriceQuery) {
+    return "promotions";
   }
 
   if (state.stage === "AGUARDANDO_ESCOLHA_PRODUTO") {

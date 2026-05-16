@@ -39,7 +39,10 @@ export function buildCategoryKeyboard(categories: string[]) {
   return rows;
 }
 
-export function buildProductActionsKeyboard(productName: string, options: { hasMoreImages?: boolean } = {}) {
+export function buildProductActionsKeyboard(
+  productName: string,
+  options: { hasMoreImages?: boolean; backCategoryName?: string } = {},
+) {
   const rows: Array<Array<{ text: string; callbackData: string }>> = [];
 
   if (options.hasMoreImages) {
@@ -47,7 +50,11 @@ export function buildProductActionsKeyboard(productName: string, options: { hasM
   }
 
   rows.push([{ text: "Falar com vendedor", callbackData: `PRODUCT:SELLER:${productName}` }]);
-  rows.push([{ text: "Voltar para categorias", callbackData: "MENU:PRODUCTS" }]);
+  rows.push([
+    options.backCategoryName
+      ? { text: "Voltar para lista", callbackData: `CATEGORY_GENERAL:${options.backCategoryName}` }
+      : { text: "Voltar", callbackData: "MENU:PRODUCTS" },
+  ]);
   return rows;
 }
 
@@ -77,6 +84,13 @@ export function buildCategoryRefinementKeyboard(categoryName: string, options: s
   rows.push([{ text: "Ver opcoes gerais", callbackData: `CATEGORY_GENERAL:${categoryName}` }]);
   rows.push([{ text: "Falar com vendedor", callbackData: "MENU:HUMAN_HANDOFF" }]);
   return rows;
+}
+
+export function buildCategoryBrowseKeyboard(categoryName: string) {
+  return [
+    [{ text: "Ver opcoes gerais", callbackData: `CATEGORY_GENERAL:${categoryName}` }],
+    [{ text: "Falar com vendedor", callbackData: "MENU:HUMAN_HANDOFF" }],
+  ];
 }
 
 export function buildSearchRefinementKeyboard(baseTerm: string, options: string[]) {

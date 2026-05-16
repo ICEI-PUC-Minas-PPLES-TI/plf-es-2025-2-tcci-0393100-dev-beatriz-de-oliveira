@@ -6,7 +6,7 @@ import type { ChatbotContext, ChatbotResponse, IntentHandler } from "../types.js
 import {
   buildCategoryKeyboard,
   buildCategoryPromptText,
-  buildCategoryRefinementKeyboard,
+  buildCategoryBrowseKeyboard,
   buildCommercialHandoffText,
   buildMainMenuKeyboard,
   buildProductActionsKeyboard,
@@ -56,24 +56,6 @@ function extractCategoryRefinement(messageText: string): { term?: string; genera
   }
 
   return { general: /\s+geral$/i.test(trimmed) || /\s+pagina\s+\d+$/i.test(trimmed) };
-}
-
-function getCategoryRefinementOptions(categoryName: string): string[] {
-  const normalized = normalizeMessageText(categoryName);
-
-  if (normalized.includes("eletronico")) {
-    return ["TVs", "Celulares", "Caixa de som", "Carregadores"];
-  }
-
-  if (normalized.includes("eletrodomestico")) {
-    return ["Geladeiras", "Fogoes", "Micro-ondas", "Lavadoras"];
-  }
-
-  if (normalized.includes("brinquedo")) {
-    return ["Bonecas", "Carrinhos", "Educativos", "Jogos"];
-  }
-
-  return [];
 }
 
 function productMatchesTerm(product: Produto, term: string): boolean {
@@ -136,7 +118,10 @@ export class ProductsHandler implements IntentHandler {
           actions: ["product_gallery"],
           handoffRequested: false,
           telegram: {
-            inlineKeyboard: buildProductActionsKeyboard(selectedProduct.nome, { hasMoreImages: (selectedProduct.images?.length ?? 0) > 1 }),
+            inlineKeyboard: buildProductActionsKeyboard(selectedProduct.nome, {
+              hasMoreImages: (selectedProduct.images?.length ?? 0) > 1,
+              backCategoryName: context.state.selectedCategoryName,
+            }),
           },
           stateTransition: {
             stage: "AGUARDANDO_ESCOLHA_PRODUTO",
@@ -159,7 +144,10 @@ export class ProductsHandler implements IntentHandler {
           actions: ["product_details"],
           handoffRequested: false,
           telegram: {
-            inlineKeyboard: buildProductActionsKeyboard(selectedProduct.nome, { hasMoreImages: (selectedProduct.images?.length ?? 0) > 1 }),
+            inlineKeyboard: buildProductActionsKeyboard(selectedProduct.nome, {
+              hasMoreImages: (selectedProduct.images?.length ?? 0) > 1,
+              backCategoryName: context.state.selectedCategoryName,
+            }),
           },
           stateTransition: {
             stage: "AGUARDANDO_ESCOLHA_PRODUTO",
@@ -226,19 +214,17 @@ export class ProductsHandler implements IntentHandler {
     }
 
     const refinement = extractCategoryRefinement(context.message.originalText);
-    const refinementOptions = getCategoryRefinementOptions(categoryMatch.matchedCategory);
-
-    if (refinementOptions.length > 0 && !refinement.term && !refinement.general) {
-      const replyText = `Dentro de ${categoryMatch.matchedCategory}, o que voce procura?`;
+    if (isCategorySelection && !refinement.term && !refinement.general) {
+      const replyText = `Dentro de ${categoryMatch.matchedCategory}, digite o nome do produto que voce procura ou veja opcoes gerais.`;
       return {
         intent: this.intent,
-        handler: "ProductsHandlerRefinement",
+        handler: "ProductsHandlerCategoryPrompt",
         replyText,
         replyMessages: [replyText],
-        actions: ["ask_product_refinement"],
+        actions: ["ask_product_name_in_category"],
         handoffRequested: false,
         telegram: {
-          inlineKeyboard: buildCategoryRefinementKeyboard(categoryMatch.matchedCategory, refinementOptions),
+          inlineKeyboard: buildCategoryBrowseKeyboard(categoryMatch.matchedCategory),
         },
         stateTransition: {
           stage: "AGUARDANDO_CATEGORIA",
@@ -303,13 +289,10 @@ export class ProductsHandler implements IntentHandler {
       actions: ["list_products_by_category", "await_product_choice"],
       handoffRequested: false,
       telegram: {
-        inlineKeyboard:
-          displayedProducts.length === 1
-            ? buildProductActionsKeyboard(displayedProducts[0]!.nome, { hasMoreImages: (displayedProducts[0]!.images?.length ?? 0) > 1 })
-            : buildProductListKeyboard(displayedProducts.map((item) => item.nome), {
-                categoryName: categoryMatch.matchedCategory,
-                nextOffset: hasMoreProducts ? offset + displayedProducts.length : undefined,
-              }),
+        inlineKeyboard: buildProductListKeyboard(displayedProducts.map((item) => item.nome), {
+          categoryName: categoryMatch.matchedCategory,
+          nextOffset: hasMoreProducts ? offset + displayedProducts.length : undefined,
+        }),
         keyboardPrompt: "Escolha uma acao para continuar.",
       },
       stateTransition: {

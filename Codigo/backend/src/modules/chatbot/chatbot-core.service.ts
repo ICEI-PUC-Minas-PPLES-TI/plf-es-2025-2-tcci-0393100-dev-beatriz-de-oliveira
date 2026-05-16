@@ -11,10 +11,7 @@ import { MessageRouter } from "./message-router.js";
 import { GreetingHandler } from "./handlers/greeting.handler.js";
 import {
   buildCommercialHandoffText,
-  buildHandoffKeyboard,
-  buildProductActionsKeyboard,
   buildProductListKeyboard,
-  buildSearchRefinementKeyboard,
 } from "./handlers/shared.js";
 import { HumanHandoffHandler } from "./handlers/human-handoff.handler.js";
 import { LeadHandler } from "./handlers/lead.handler.js";
@@ -173,21 +170,6 @@ function toCurrency(value: string): string {
     return value;
   }
   return parsed.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-}
-
-function getBroadSearchTerm(normalizedText: string): string | null {
-  if (normalizedText.includes("opcoes gerais")) {
-    return null;
-  }
-
-  if (
-    (normalizedText.includes("caixa de som") || normalizedText.includes("caixa som"))
-    && !/(bluetooth|portatil|casa|barata|barato|potente|potencia)/i.test(normalizedText)
-  ) {
-    return "caixa de som";
-  }
-
-  return null;
 }
 
 function hasMeaningfulCustomerName(name?: string | null): boolean {
@@ -432,36 +414,7 @@ export class ChatbotCoreService {
     };
   }
 
-  private buildProductOverrideResponse(
-    products: Array<{ nome: string; preco: string; descricao: string }>,
-  ): ChatbotResponse {
-    if (products.length === 1) {
-      const product = products[0]!;
-      const replyText = [
-        "Encontrei este produto.",
-        `${product.nome}\n${toCurrency(product.preco)}\n${product.descricao.trim().slice(0, 120) || "Sem descricao no momento."}`,
-        buildCommercialHandoffText(),
-      ].join("\n\n");
-      return {
-        intent: "products",
-        handler: "ProductSearchOverrideHandler",
-        replyText,
-        replyMessages: [replyText],
-        actions: ["product_search_override", "product_found", "ask_human_handoff_confirmation"],
-        handoffRequested: false,
-        telegram: {
-          inlineKeyboard: buildHandoffKeyboard(),
-        },
-        stateTransition: {
-          stage: "CONSULTANDO_PRODUTOS",
-          awaitingHumanHandoffDecision: true,
-          awaitingProductSelectionForInterest: false,
-          lastShownProducts: [product.nome],
-          selectedProductName: product.nome,
-        },
-      };
-    }
-
+  private buildProductOverrideResponse(products: Array<{ nome: string; preco: string; descricao: string }>): ChatbotResponse {
     const listedProducts = products.slice(0, 3);
     const replyText = [
       "Encontrei algumas opcoes.",
@@ -486,58 +439,12 @@ export class ChatbotCoreService {
         awaitingHumanHandoffDecision: false,
         awaitingProductSelectionForInterest: false,
         lastShownProducts: listedProducts.map((product) => product.nome),
-        selectedProductName: undefined,
-      },
-    };
-  }
-
-  private buildSearchRefinementResponse(baseTerm: string): ChatbotResponse {
-    const replyText =
-      baseTerm === "caixa de som"
-        ? "Voce procura caixa de som de qual tipo?"
-        : `O que voce procura em ${baseTerm}?`;
-
-    return {
-      intent: "products",
-      handler: "ProductSearchRefinementHandler",
-      replyText,
-      replyMessages: [replyText],
-      actions: ["ask_product_search_refinement"],
-      handoffRequested: false,
-      telegram: {
-        inlineKeyboard: buildSearchRefinementKeyboard(baseTerm, [
-          "Portatil/Bluetooth",
-          "Para casa",
-          "Mais barata",
-          "Mais potente",
-        ]),
-      },
-      stateTransition: {
-        stage: "AGUARDANDO_CATEGORIA",
-        awaitingHumanHandoffDecision: false,
-        awaitingProductSelectionForInterest: false,
-        lastShownProducts: [],
-        selectedCategoryName: baseTerm,
-        selectedProductName: undefined,
+        selectedProductName: listedProducts.length === 1 ? listedProducts[0]!.nome : undefined,
       },
     };
   }
 
   private async tryProductSearchOverride(context: ChatbotContext): Promise<ChatbotResponse | null> {
-    const broadSearchTerm = getBroadSearchTerm(context.message.normalizedText);
-    if (broadSearchTerm) {
-      this.logger.info(
-        {
-          event: "product_search_refinement_requested",
-          phone: context.message.from,
-          originalText: context.message.originalText,
-          broadSearchTerm,
-        },
-        "[ChatbotProduct]",
-      );
-      return this.buildSearchRefinementResponse(broadSearchTerm);
-    }
-
     const productSearch = await findMatchingProducts(
       context.message.originalText,
       (input) => this.productsService.searchByName(input),
@@ -677,7 +584,8 @@ export class ChatbotCoreService {
         && detectedIntent !== "human_handoff"
         && detectedIntent !== "promotions"
         && detectedIntent !== "menu"
-        && detectedIntent !== "greeting";
+        && detectedIntent !== "greeting"
+        && !normalized.normalizedText.startsWith("categoria ");
 
       if (canOverrideWithProduct) {
         const overrideResponse = await this.tryProductSearchOverride(context);

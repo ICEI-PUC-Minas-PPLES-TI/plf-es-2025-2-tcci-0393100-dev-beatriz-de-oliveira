@@ -100,6 +100,7 @@ function resolvePromotionProduct(
   promotions: Promocao[],
   products: Produto[],
   normalizedText: string,
+  recentPromotionProducts: string[] = [],
 ): { promotion: Promocao; product?: Produto } | null {
   const tokens = productTokensFromMessage(normalizedText);
   if (tokens.length === 0) {
@@ -107,13 +108,15 @@ function resolvePromotionProduct(
   }
 
   const productsById = new Map(products.map((product) => [product.id, product]));
+  const recent = new Set(recentPromotionProducts.map((productName) => normalizeMessageText(productName)));
   const ranked = promotions
     .map((promotion) => {
       const product = productsById.get(promotion.produto_id);
+      const promotionName = normalizeMessageText(promotion.produto);
       return {
         promotion,
         product,
-        score: scorePromotionMatch(promotion, product, tokens),
+        score: scorePromotionMatch(promotion, product, tokens) + (recent.has(promotionName) ? 25 : 0),
       };
     })
     .filter((item) => item.score > 0)
@@ -171,9 +174,13 @@ export class PromotionsHandler implements IntentHandler {
       };
     }
 
-    if (isPromotionPriceQuestion(context.message.normalizedText)) {
+    const isRecentPromotionPriceQuestion =
+      context.state.recentPromotions.length > 0
+      && PROMOTION_PRICE_KEYWORDS.some((keyword) => context.message.normalizedText.includes(keyword));
+
+    if (isPromotionPriceQuestion(context.message.normalizedText) || isRecentPromotionPriceQuestion || context.state.awaitingPromotionPriceQuery) {
       const products = await this.productsService.list();
-      const match = resolvePromotionProduct(promotions, products, context.message.normalizedText);
+      const match = resolvePromotionProduct(promotions, products, context.message.normalizedText, context.state.recentPromotions);
 
       if (!match?.product) {
         return {
@@ -189,6 +196,8 @@ export class PromotionsHandler implements IntentHandler {
           stateTransition: {
             stage: "MENU_PRINCIPAL",
             awaitingHumanHandoffDecision: false,
+            recentPromotions: promotions.slice(0, 5).map((promotion) => promotion.produto),
+            awaitingPromotionPriceQuery: true,
           },
         };
       }
@@ -226,6 +235,9 @@ export class PromotionsHandler implements IntentHandler {
           stage: "MENU_PRINCIPAL",
           awaitingHumanHandoffDecision: false,
           selectedProductName: match.product.nome,
+          recentPromotions: promotions.slice(0, 5).map((promotion) => promotion.produto),
+          selectedPromotionProduct: match.product.nome,
+          awaitingPromotionPriceQuery: false,
         },
       };
     }
@@ -248,6 +260,8 @@ export class PromotionsHandler implements IntentHandler {
       stateTransition: {
         stage: "MENU_PRINCIPAL",
         awaitingHumanHandoffDecision: false,
+        recentPromotions: promotions.slice(0, 5).map((promotion) => promotion.produto),
+        awaitingPromotionPriceQuery: true,
       },
     };
   }

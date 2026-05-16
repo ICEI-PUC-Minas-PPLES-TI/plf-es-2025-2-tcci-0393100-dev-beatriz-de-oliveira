@@ -419,7 +419,7 @@ export class TelegramService {
     const replyMessages = response.replyMessages?.filter((message) => message.trim()) ?? [];
     const shouldRenderProductCards =
       response.intent === "products"
-      && response.actions.some((action) => ["product_details", "product_gallery", "product_found", "product_search_override"].includes(action));
+      && response.actions.some((action) => ["product_details", "product_gallery"].includes(action));
 
     if (replyMessages.length > 0 && !shouldRenderProductCards) {
       for (let index = 0; index < replyMessages.length; index += 1) {
