@@ -160,7 +160,7 @@ function extractIncomingMessages(payload: Record<string, unknown>): WhatsAppInco
 }
 
 function buildInterestSummary(messageText: string): string {
-  return messageText.slice(0, 140) || "Interesse informado no WhatsApp";
+  return messageText.slice(0, 140) || "Interesse informado no Telegram";
 }
 
 function resolveProductNameFromText(normalizedText: string, productNames: string[]): string | undefined {
@@ -200,7 +200,7 @@ function hasMeaningfulCustomerName(name?: string | null): boolean {
     return false;
   }
 
-  return !["cliente whatsapp", "cliente sem nome", "contato whatsapp", "contato sem nome"].includes(normalized);
+  return !["cliente sem nome", "contato sem nome"].includes(normalized);
 }
 
 function formatCustomerName(name: string): string {

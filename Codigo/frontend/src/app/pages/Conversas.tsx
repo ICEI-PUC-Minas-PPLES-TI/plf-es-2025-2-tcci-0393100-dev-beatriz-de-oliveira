@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
-import { Bot, CheckCircle2, Headphones, MessageCircle, Search, Send, Smartphone, UserRound, X } from "lucide-react";
+import { Bot, CheckCircle2, Headphones, MessageCircle, Search, Send, UserRound, X } from "lucide-react";
 import { toast } from "sonner";
 import { HttpError } from "../api/httpClient";
 import { StatusBadge } from "../components/StatusBadge";
@@ -48,7 +48,7 @@ function getConversationIdentifier(channel: ConversationChannel | undefined, con
     return `ID Telegram: ${rawValue}`;
   }
 
-  return rawValue;
+  return `ID Telegram: ${rawValue}`;
 }
 
 function normalizeSender(message: Mensagem): SenderKind {
@@ -89,19 +89,11 @@ function getSenderVisual(sender: SenderKind) {
   };
 }
 
-function getChannelVisual(channel: ConversationChannel | undefined) {
-  if (channel === "telegram") {
-    return {
-      label: "Telegram",
-      className: "border-blue-200 bg-blue-50 text-blue-700",
-      icon: Send,
-    };
-  }
-
+function getChannelVisual(_channel: ConversationChannel | undefined) {
   return {
-    label: "WhatsApp",
-    className: "border-emerald-200 bg-emerald-50 text-emerald-700",
-    icon: Smartphone,
+    label: "Telegram",
+    className: "border-blue-200 bg-blue-50 text-blue-700",
+    icon: Send,
   };
 }
 
@@ -242,20 +234,20 @@ function buildTimelineItems(messages: Mensagem[]): TimelineItem[] {
 }
 
 function isValidChannelFilter(value: string | null): value is ConversationChannel {
-  return value?.toLowerCase() === "whatsapp" || value?.toLowerCase() === "telegram";
+  return value?.toLowerCase() === "telegram";
 }
 
 function normalizeChannelFilter(value: string | null | undefined): ChannelFilter {
   if (!value) {
-    return "todos";
+    return "telegram";
   }
 
   const normalized = value.toLowerCase();
-  return isValidChannelFilter(normalized) ? normalized : "todos";
+  return isValidChannelFilter(normalized) ? normalized : "telegram";
 }
 
 export function Conversas() {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const initialChannel = normalizeChannelFilter(searchParams.get("channel"));
   const [channelFilter, setChannelFilter] = useState<ChannelFilter>(initialChannel);
   const [statusFilter, setStatusFilter] = useState<AtendimentoStatus | "todos">("todos");
@@ -367,21 +359,6 @@ export function Conversas() {
     }
   };
 
-  const updateChannelFilter = (nextFilter: ChannelFilter) => {
-    const normalizedFilter = normalizeChannelFilter(nextFilter);
-    setChannelFilter(normalizedFilter);
-    setStatusFilter("todos");
-    setSelectedConversationId(null);
-    setSearchTerm("");
-
-    if (normalizedFilter === "todos") {
-      setSearchParams({});
-      return;
-    }
-
-    setSearchParams({ channel: normalizedFilter });
-  };
-
   const handleEnviarMensagem = async () => {
     if (!selectedConversation || !newMessage.trim()) {
       return;
@@ -394,11 +371,8 @@ export function Conversas() {
       await Promise.all([reloadMessages(), reloadConversations()]);
       toast.success("Mensagem enviada");
     } catch (error) {
-      if (
-        error instanceof HttpError &&
-        (error.payload?.code === "WHATSAPP_OUTBOUND_NOT_CONFIGURED" || error.payload?.code === "TELEGRAM_BOT_NOT_CONFIGURED")
-      ) {
-        toast.error("O provedor de envio deste canal ainda não está configurado neste ambiente.");
+      if (error instanceof HttpError && error.payload?.code === "TELEGRAM_BOT_NOT_CONFIGURED") {
+        toast.error("O bot do Telegram ainda nao esta configurado neste ambiente.");
       } else {
         console.error("[Conversas] sendConversationMessage failed", error);
         const message = error instanceof Error ? error.message : "Falha ao enviar mensagem";
@@ -526,24 +500,6 @@ export function Conversas() {
                 onChange={(event) => setSearchTerm(event.target.value)}
                 className="pl-10"
               />
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              {[
-                { value: "todos", label: "Todos" },
-                { value: "whatsapp", label: "WhatsApp" },
-                { value: "telegram", label: "Telegram" },
-              ].map((item) => (
-                <Button
-                  key={item.value}
-                  type="button"
-                  variant={channelFilter === item.value ? "default" : "outline"}
-                  className="rounded-full"
-                  onClick={() => updateChannelFilter(item.value as ChannelFilter)}
-                >
-                  {item.label}
-                </Button>
-              ))}
             </div>
 
             <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as AtendimentoStatus | "todos")}>

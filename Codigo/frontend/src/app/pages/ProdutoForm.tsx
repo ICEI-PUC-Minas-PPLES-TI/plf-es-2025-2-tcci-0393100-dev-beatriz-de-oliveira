@@ -1,6 +1,6 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { ArrowLeft, Save, Trash2, Upload } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, ImagePlus, Save, Star, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { adminDataService } from "../services/adminDataService";
 import { useProdutosData } from "../hooks/useAdminData";
@@ -23,6 +23,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Switch } from "../components/ui/switch";
 import { Textarea } from "../components/ui/textarea";
 import { ImageWithFallback } from "../components/ImageWithFallback";
+import type { ProductImage } from "../types/domain";
 
 interface ProdutoFormData {
   nome: string;
@@ -31,7 +32,7 @@ interface ProdutoFormData {
   preco: string;
   quantidade: string;
   disponibilidade: boolean;
-  imagem: string;
+  images: ProductImage[];
 }
 
 function loadImage(file: File): Promise<HTMLImageElement> {
@@ -44,7 +45,7 @@ function loadImage(file: File): Promise<HTMLImageElement> {
     };
     image.onerror = () => {
       URL.revokeObjectURL(objectUrl);
-      reject(new Error("Não foi possível carregar a imagem selecionada."));
+      reject(new Error("Nao foi possivel carregar a imagem selecionada."));
     };
     image.src = objectUrl;
   });
@@ -63,11 +64,43 @@ async function optimizeImage(file: File): Promise<string> {
 
   const context = canvas.getContext("2d");
   if (!context) {
-    throw new Error("Não foi possível processar a imagem selecionada.");
+    throw new Error("Nao foi possivel processar a imagem selecionada.");
   }
 
   context.drawImage(image, 0, 0, width, height);
   return canvas.toDataURL("image/jpeg", 0.82);
+}
+
+function normalizeImages(images: ProductImage[]): ProductImage[] {
+  const cleaned = images
+    .map((image) => image.imageUrl.trim())
+    .filter(Boolean)
+    .filter((imageUrl, index, all) => all.indexOf(imageUrl) === index)
+    .map((imageUrl, index) => ({
+      imageUrl,
+      ordem: index,
+      principal: false,
+    }));
+
+  if (cleaned.length > 0) {
+    const preferred = images.find((image) => image.principal && image.imageUrl.trim());
+    const preferredIndex = preferred ? cleaned.findIndex((image) => image.imageUrl === preferred.imageUrl.trim()) : -1;
+    cleaned[preferredIndex >= 0 ? preferredIndex : 0] = {
+      ...cleaned[preferredIndex >= 0 ? preferredIndex : 0]!,
+      principal: true,
+    };
+  }
+
+  return cleaned;
+}
+
+function isHttpUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
 export function ProdutoForm() {
@@ -84,9 +117,9 @@ export function ProdutoForm() {
       Array.from(
         new Set([
           ...produtos.map((produto) => produto.categoria),
-          "Sofás",
-          "Eletrodomésticos",
-          "Eletrônicos",
+          "Sofas",
+          "Eletrodomesticos",
+          "Eletronicos",
           "Mesas",
           "Guarda-Roupas",
           "Camas",
@@ -103,8 +136,9 @@ export function ProdutoForm() {
     preco: "",
     quantidade: "0",
     disponibilidade: false,
-    imagem: "",
+    images: [],
   });
+  const [newImageUrl, setNewImageUrl] = useState("");
   const [deleteDialog, setDeleteDialog] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -112,6 +146,13 @@ export function ProdutoForm() {
 
   useEffect(() => {
     if (isEdit && produtoAtual) {
+      const productImages =
+        produtoAtual.images?.length > 0
+          ? produtoAtual.images
+          : produtoAtual.imagem
+            ? [{ imageUrl: produtoAtual.imagem, ordem: 0, principal: true }]
+            : [];
+
       setFormData({
         nome: produtoAtual.nome,
         categoria: produtoAtual.categoria,
@@ -119,7 +160,7 @@ export function ProdutoForm() {
         preco: produtoAtual.preco,
         quantidade: String(produtoAtual.quantidade ?? 0),
         disponibilidade: produtoAtual.disponivel,
-        imagem: produtoAtual.imagem,
+        images: normalizeImages(productImages),
       });
     }
   }, [isEdit, produtoAtual]);
@@ -130,32 +171,43 @@ export function ProdutoForm() {
     }
 
     if (!produtoAtual) {
-      toast.error("Produto não encontrado");
+      toast.error("Produto nao encontrado");
       navigate("/produtos", { replace: true });
     }
   }, [isEdit, isLoadingProdutos, navigate, produtoAtual]);
 
+  const updateImages = (updater: (images: ProductImage[]) => ProductImage[]) => {
+    setFormData((current) => ({
+      ...current,
+      images: normalizeImages(updater(current.images)),
+    }));
+  };
+
   const handleImageChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) {
+    const files = Array.from(event.target.files ?? []);
+    if (files.length === 0) {
       return;
     }
 
-    if (!file.type.startsWith("image/")) {
-      toast.error("Selecione um arquivo de imagem válido.");
+    const invalidFile = files.find((file) => !file.type.startsWith("image/"));
+    if (invalidFile) {
+      toast.error("Selecione apenas arquivos de imagem validos.");
       event.target.value = "";
       return;
     }
 
     setIsUploadingImage(true);
     try {
-      const imageDataUrl = await optimizeImage(file);
-      if (!imageDataUrl) {
-        throw new Error("Não foi possível processar a imagem selecionada.");
-      }
-
-      setFormData((current) => ({ ...current, imagem: imageDataUrl }));
-      toast.success("Imagem carregada com sucesso");
+      const imageDataUrls = await Promise.all(files.map((file) => optimizeImage(file)));
+      updateImages((images) => [
+        ...images,
+        ...imageDataUrls.map((imageUrl) => ({
+          imageUrl,
+          ordem: images.length,
+          principal: images.length === 0,
+        })),
+      ]);
+      toast.success(`${imageDataUrls.length} imagem(ns) adicionada(s)`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Falha ao carregar imagem";
       toast.error(message);
@@ -165,12 +217,32 @@ export function ProdutoForm() {
     }
   };
 
+  const handleAddImageUrl = () => {
+    const imageUrl = newImageUrl.trim();
+    if (!isHttpUrl(imageUrl)) {
+      toast.error("Informe uma URL http ou https valida.");
+      return;
+    }
+
+    updateImages((images) => [
+      ...images,
+      {
+        imageUrl,
+        ordem: images.length,
+        principal: images.length === 0,
+      },
+    ]);
+    setNewImageUrl("");
+  };
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setIsSubmitting(true);
 
-    if (!formData.imagem) {
-      toast.error("Envie uma imagem válida para o produto.");
+    const images = normalizeImages(formData.images);
+    const primaryImage = images.find((image) => image.principal)?.imageUrl ?? images[0]?.imageUrl ?? "";
+    if (!primaryImage) {
+      toast.error("Adicione pelo menos uma imagem valida para o produto.");
       setIsSubmitting(false);
       return;
     }
@@ -184,7 +256,9 @@ export function ProdutoForm() {
         preco: formData.preco,
         quantidade: Number.isNaN(quantidade) ? 0 : quantidade,
         disponivel: formData.disponibilidade,
-        imagem: formData.imagem,
+        imagem: primaryImage,
+        primaryImage,
+        images,
       };
 
       if (isEdit && id) {
@@ -212,7 +286,7 @@ export function ProdutoForm() {
     setIsDeleting(true);
     try {
       await adminDataService.deleteProduto(Number(id));
-      toast.success("Produto excluído com sucesso");
+      toast.success("Produto excluido com sucesso");
       navigate("/produtos");
     } catch (deleteError) {
       const message = deleteError instanceof Error ? deleteError.message : "Falha ao excluir produto";
@@ -221,6 +295,18 @@ export function ProdutoForm() {
       setIsDeleting(false);
       setDeleteDialog(false);
     }
+  };
+
+  const moveImage = (index: number, direction: -1 | 1) => {
+    updateImages((images) => {
+      const next = [...images];
+      const targetIndex = index + direction;
+      if (targetIndex < 0 || targetIndex >= next.length) {
+        return next;
+      }
+      [next[index], next[targetIndex]] = [next[targetIndex]!, next[index]!];
+      return next;
+    });
   };
 
   return (
@@ -243,7 +329,7 @@ export function ProdutoForm() {
         <div>
           <h2 className="text-2xl font-bold text-gray-900">{isEdit ? "Editar Produto" : "Cadastrar Novo Produto"}</h2>
           <p className="mt-1 text-muted-foreground">
-            {isEdit ? "Atualize as informações do produto" : "Preencha os dados do produto"}
+            {isEdit ? "Atualize as informacoes do produto" : "Preencha os dados do produto"}
           </p>
         </div>
         <Button variant="outline" onClick={() => navigate("/produtos")}>
@@ -266,7 +352,7 @@ export function ProdutoForm() {
                   value={formData.nome}
                   onChange={(event) => setFormData({ ...formData, nome: event.target.value })}
                   required
-                  placeholder="Ex: Sofá Retrátil Premium"
+                  placeholder="Ex: Sofa Retratil Premium"
                 />
               </div>
 
@@ -328,30 +414,104 @@ export function ProdutoForm() {
                 />
               </div>
 
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="imagem_upload">Imagem do Produto *</Label>
+              <div className="space-y-3 md:col-span-2">
+                <Label htmlFor="imagem_upload">Imagens do Produto *</Label>
                 <Input
                   id="imagem_upload"
                   type="file"
                   accept="image/*"
+                  multiple
                   onChange={(event) => {
                     void handleImageChange(event);
                   }}
                   disabled={isUploadingImage}
                 />
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Input
+                    value={newImageUrl}
+                    onChange={(event) => setNewImageUrl(event.target.value)}
+                    placeholder="https://exemplo.com/produto.jpg"
+                  />
+                  <Button type="button" variant="outline" onClick={handleAddImageUrl}>
+                    <ImagePlus className="mr-2 h-4 w-4" />
+                    Adicionar URL
+                  </Button>
+                </div>
                 <p className="text-xs text-muted-foreground">
-                  Selecione uma imagem do seu computador. Ela será otimizada antes do envio para evitar erro de tamanho.
+                  A imagem principal aparece primeiro no Telegram. Fotos extras ficam na galeria do botao Ver mais fotos.
                 </p>
               </div>
 
               <div className="space-y-3 md:col-span-2">
-                <Label>Pré-visualização da Imagem</Label>
-                {formData.imagem ? (
-                  <div className="w-full max-w-xs overflow-hidden rounded-lg border border-gray-200 bg-gray-50 p-2">
-                    <ImageWithFallback src={formData.imagem} alt={formData.nome || "Pré-visualização do produto"} className="h-48 w-full rounded-md object-cover" />
+                <Label>Pré-visualização das Imagens</Label>
+                {formData.images.length > 0 ? (
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {formData.images.map((image, index) => (
+                      <div key={`${image.imageUrl}-${index}`} className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+                        <ImageWithFallback
+                          src={image.imageUrl}
+                          alt={`${formData.nome || "Produto"} - imagem ${index + 1}`}
+                          className="h-44 w-full object-cover"
+                        />
+                        <div className="space-y-3 p-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="truncate text-sm font-medium">Imagem {index + 1}</span>
+                            {image.principal && (
+                              <span className="rounded bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700">
+                                Principal
+                              </span>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-4 gap-2">
+                            <Button
+                              type="button"
+                              variant={image.principal ? "default" : "outline"}
+                              size="icon"
+                              aria-label={`Definir imagem ${index + 1} como principal`}
+                              onClick={() =>
+                                updateImages((images) =>
+                                  images.map((item, itemIndex) => ({ ...item, principal: itemIndex === index })),
+                                )
+                              }
+                            >
+                              <Star className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              aria-label={`Mover imagem ${index + 1} para cima`}
+                              disabled={index === 0}
+                              onClick={() => moveImage(index, -1)}
+                            >
+                              <ArrowUp className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              aria-label={`Mover imagem ${index + 1} para baixo`}
+                              disabled={index === formData.images.length - 1}
+                              onClick={() => moveImage(index, 1)}
+                            >
+                              <ArrowDown className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              aria-label={`Remover imagem ${index + 1}`}
+                              onClick={() => updateImages((images) => images.filter((_, itemIndex) => itemIndex !== index))}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-600" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 ) : (
-                  <div className="flex h-32 w-full max-w-xs items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 text-sm text-muted-foreground">
+                  <div className="flex h-32 w-full max-w-sm items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 text-sm text-muted-foreground">
                     <div className="flex items-center gap-2">
                       <Upload className="h-4 w-4" />
                       Nenhuma imagem selecionada

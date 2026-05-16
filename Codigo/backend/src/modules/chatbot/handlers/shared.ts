@@ -39,12 +39,16 @@ export function buildCategoryKeyboard(categories: string[]) {
   return rows;
 }
 
-export function buildProductActionsKeyboard(productName: string) {
-  return [
-    [{ text: "Ver mais", callbackData: `PRODUCT:MORE:${productName}` }],
-    [{ text: "Tenho interesse", callbackData: `PRODUCT:INTEREST:${productName}` }],
-    [{ text: "Falar com vendedor", callbackData: `PRODUCT:SELLER:${productName}` }],
-  ];
+export function buildProductActionsKeyboard(productName: string, options: { hasMoreImages?: boolean } = {}) {
+  const rows: Array<Array<{ text: string; callbackData: string }>> = [];
+
+  if (options.hasMoreImages) {
+    rows.push([{ text: "Ver mais fotos", callbackData: `PRODUCT:PHOTOS:${productName}` }]);
+  }
+
+  rows.push([{ text: "Falar com vendedor", callbackData: `PRODUCT:SELLER:${productName}` }]);
+  rows.push([{ text: "Voltar para categorias", callbackData: "MENU:PRODUCTS" }]);
+  return rows;
 }
 
 export function buildProductListKeyboard(

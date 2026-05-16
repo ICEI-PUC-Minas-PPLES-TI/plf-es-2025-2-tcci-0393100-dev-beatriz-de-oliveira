@@ -3,7 +3,7 @@ import type { ChatbotContext, ChatbotResponse, IntentHandler, LeadUpsertInput } 
 import { buildCommercialHandoffText, buildHandoffKeyboard, buildInterestSelectionKeyboard } from "./shared.js";
 
 function buildInterestSummary(messageText: string): string {
-  return messageText.slice(0, 140) || "Interesse informado no WhatsApp";
+  return messageText.slice(0, 140) || "Interesse informado no Telegram";
 }
 
 export class LeadHandler implements IntentHandler {

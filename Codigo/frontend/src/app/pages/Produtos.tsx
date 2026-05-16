@@ -89,6 +89,10 @@ function parseCsvBoolean(value: string): boolean {
   return ["1", "true", "sim", "s", "yes", "disponivel", "disponível"].includes(value.trim().toLowerCase());
 }
 
+function getPrimaryImage(produto: Produto): string {
+  return produto.primaryImage || produto.images?.find((image) => image.principal)?.imageUrl || produto.images?.[0]?.imageUrl || produto.imagem;
+}
+
 export function Produtos() {
   const { data: produtos, isLoading, error, reload } = useProdutosData();
   const navigate = useNavigate();
@@ -142,7 +146,7 @@ export function Produtos() {
         produto.preco,
         produto.quantidade ?? 0,
         produto.disponivel ? "true" : "false",
-        produto.imagem,
+        getPrimaryImage(produto),
       ]),
     ];
 
@@ -165,15 +169,20 @@ export function Produtos() {
         return;
       }
 
-      const produtosCsv: Array<Omit<Produto, "id">> = rows.map((row) => ({
-        nome: row.nome?.trim() ?? "",
-        categoria: row.categoria?.trim() ?? "",
-        descricao: row.descricao?.trim() ?? "",
-        preco: row.preco?.trim() ?? "",
-        quantidade: Math.max(0, Number.parseInt(row.quantidade || "0", 10) || 0),
-        disponivel: parseCsvBoolean(row.disponivel ?? row.disponibilidade ?? "true"),
-        imagem: row.imagem?.trim() ?? "",
-      }));
+      const produtosCsv: Array<Omit<Produto, "id">> = rows.map((row) => {
+        const imagem = row.imagem?.trim() ?? "";
+        return {
+          nome: row.nome?.trim() ?? "",
+          categoria: row.categoria?.trim() ?? "",
+          descricao: row.descricao?.trim() ?? "",
+          preco: row.preco?.trim() ?? "",
+          quantidade: Math.max(0, Number.parseInt(row.quantidade || "0", 10) || 0),
+          disponivel: parseCsvBoolean(row.disponivel ?? row.disponibilidade ?? "true"),
+          imagem,
+          primaryImage: imagem,
+          images: imagem ? [{ imageUrl: imagem, ordem: 0, principal: true }] : [],
+        };
+      });
 
       const invalidRows = produtosCsv.filter((produto) => !produto.nome || !produto.categoria || !produto.descricao || !produto.preco || !produto.imagem);
       if (invalidRows.length > 0) {
@@ -333,7 +342,7 @@ export function Produtos() {
                   <TableRow key={produto.id} className="hover:bg-gray-50">
                     <TableCell>
                       <ImageWithFallback
-                        src={produto.imagem}
+                        src={getPrimaryImage(produto)}
                         alt={produto.nome}
                         className="h-16 w-16 rounded-lg object-cover shadow-sm"
                       />

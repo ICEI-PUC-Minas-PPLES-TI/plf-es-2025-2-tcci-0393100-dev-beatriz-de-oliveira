@@ -13,6 +13,45 @@ type TelegramApiErrorPayload = {
   description?: string;
 };
 
+const TELEGRAM_CAPTION_LIMIT = 1024;
+const TELEGRAM_REQUEST_TIMEOUT_MS = 15000;
+
+type TelegramDeliveryOptions = {
+  atendimentoId?: number;
+  sender?: "CHATBOT" | "ATENDENTE";
+  status?: "ATIVO" | "PENDENTE" | "ENCERRADO";
+  handoffRequested?: boolean;
+  intent?: string;
+  stage?: string;
+};
+
+function isHttpUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function parseDataUrl(value: string): { mimeType: string; bytes: Uint8Array } | null {
+  const match = value.match(/^data:([^;,]+);base64,(.+)$/);
+  if (!match?.[1] || !match[2]) {
+    return null;
+  }
+
+  return {
+    mimeType: match[1],
+    bytes: Uint8Array.from(Buffer.from(match[2], "base64")),
+  };
+}
+
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  return buffer;
+}
+
 function formatErrorDetails(error: unknown) {
   if (error instanceof Error) {
     return {
@@ -379,7 +418,7 @@ export class TelegramService {
 
     const replyMessages = response.replyMessages?.filter((message) => message.trim()) ?? [];
     const shouldRenderProductCards =
-      response.intent === "products" && response.actions.includes("telegram_photo_card");
+      response.intent === "products" && (response.actions.includes("product_details") || response.actions.includes("product_gallery"));
 
     if (replyMessages.length > 0 && !shouldRenderProductCards) {
       for (let index = 0; index < replyMessages.length; index += 1) {
@@ -407,7 +446,7 @@ export class TelegramService {
       return;
     }
 
-    if (prepared.introText) {
+    if (prepared.introText && !response.actions.includes("product_gallery")) {
       await this.sendTextMessage(chatId, prepared.introText, undefined, deliveryState);
       console.info("[Telegram] Resposta enviada em texto", {
         chatId,
@@ -416,10 +455,40 @@ export class TelegramService {
       });
     }
 
+    if (response.actions.includes("product_gallery")) {
+      const card = prepared.productCards[0];
+      const galleryImages = card?.images.filter((image) => image !== card.imageUrl).slice(0, 3) ?? [];
+
+      if (card && galleryImages.length > 0) {
+        try {
+          await this.sendMediaGroup(chatId, galleryImages, deliveryState);
+          console.info("[Telegram] Galeria enviada", {
+            chatId,
+            product: card.name,
+            images: galleryImages.length,
+          });
+        } catch (error) {
+          console.warn("[Telegram] Erro ao enviar galeria", {
+            chatId,
+            product: card.name,
+            error: formatErrorDetails(error),
+          });
+          await this.sendTextMessage(chatId, buildTelegramTextCard(card), undefined, deliveryState);
+        }
+      } else {
+        await this.sendTextMessage(chatId, "Esse produto nao tem fotos extras cadastradas.", undefined, deliveryState);
+      }
+
+      if (inlineKeyboard?.length) {
+        await this.sendTextMessage(chatId, response.telegram?.keyboardPrompt ?? "Escolha uma opcao para continuar.", inlineKeyboard, deliveryState);
+      }
+      return;
+    }
+
     for (const card of prepared.productCards) {
       if (card.imageUrl) {
         try {
-          await this.sendPhotoMessage(chatId, card.imageUrl, buildTelegramPhotoCaption(card), undefined, deliveryState);
+          await this.sendPhoto(chatId, card.imageUrl, buildTelegramPhotoCaption(card), inlineKeyboard, deliveryState);
           console.info("[Telegram] Resposta enviada com imagem", {
             chatId,
             product: card.name,
@@ -434,7 +503,7 @@ export class TelegramService {
         }
       }
 
-      await this.sendTextMessage(chatId, buildTelegramTextCard(card), undefined, deliveryState);
+      await this.sendTextMessage(chatId, buildTelegramTextCard(card), inlineKeyboard, deliveryState);
       console.info("[Telegram] Resposta enviada em texto", {
         chatId,
         product: card.name,
@@ -442,7 +511,7 @@ export class TelegramService {
       });
     }
 
-    if (inlineKeyboard?.length) {
+    if (inlineKeyboard?.length && prepared.productCards.length > 1) {
       await this.sendTextMessage(chatId, response.telegram?.keyboardPrompt ?? "Escolha uma opção para continuar.", inlineKeyboard, deliveryState);
     }
   }
@@ -562,34 +631,17 @@ export class TelegramService {
     }
   }
 
-  private async sendPhotoMessage(
+  async sendPhoto(
     chatId: string,
     photoUrl: string,
     caption: string,
     inlineKeyboard?: Array<Array<{ text: string; callbackData: string }>>,
-    options?: {
-      atendimentoId?: number;
-      sender?: "CHATBOT" | "ATENDENTE";
-      status?: "ATIVO" | "PENDENTE" | "ENCERRADO";
-      handoffRequested?: boolean;
-      intent?: string;
-      stage?: string;
-    },
+    options?: TelegramDeliveryOptions,
   ): Promise<void> {
     try {
       const token = this.getBotToken();
-      const response = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          chat_id: chatId,
-          photo: photoUrl,
-          caption,
-          reply_markup: this.buildReplyMarkup(inlineKeyboard),
-        }),
-      });
+      const safeCaption = caption.slice(0, TELEGRAM_CAPTION_LIMIT);
+      const response = await this.postTelegramPhoto(token, chatId, photoUrl, safeCaption, inlineKeyboard);
 
       if (!response.ok) {
         const payload = (await response.json().catch(() => null)) as TelegramApiErrorPayload | null;
@@ -599,7 +651,7 @@ export class TelegramService {
       const savedMessage = await this.repository.saveOutgoingMessage({
         atendimentoId: options?.atendimentoId,
         chatId,
-        text: caption,
+        text: safeCaption,
         type: "image",
         statusEntrega: "ENVIADA",
         sender: options?.sender ?? "CHATBOT",
@@ -613,7 +665,7 @@ export class TelegramService {
         conversationId: savedMessage.conversationId,
         type: "image",
         deliveryStatus: "ENVIADA",
-        preview: caption.slice(0, 80),
+        preview: safeCaption.slice(0, 80),
       });
       if (savedMessage.conversationId) {
         await this.leadStatusService.updateLeadStatusFromConversation(savedMessage.conversationId);
@@ -621,7 +673,7 @@ export class TelegramService {
     } catch (error) {
       const failedMessage = await this.repository.saveOutgoingMessage({
         chatId,
-        text: caption,
+        text: caption.slice(0, TELEGRAM_CAPTION_LIMIT),
         type: "image",
         statusEntrega: "FALHA",
         sender: options?.sender ?? "CHATBOT",
@@ -642,6 +694,106 @@ export class TelegramService {
       }
       throw error;
     }
+  }
+
+  async sendMediaGroup(chatId: string, imageUrls: string[], options?: TelegramDeliveryOptions): Promise<void> {
+    const limitedImages = imageUrls.filter((imageUrl) => imageUrl.trim()).slice(0, 3);
+    if (limitedImages.length === 0) {
+      throw new AppError("Media group requires at least one image", 400, "TELEGRAM_MEDIA_GROUP_EMPTY");
+    }
+
+    const token = this.getBotToken();
+    const formData = new FormData();
+    formData.set("chat_id", chatId);
+
+    const media = limitedImages.map((imageUrl, index) => {
+      const dataUrl = parseDataUrl(imageUrl);
+      if (dataUrl) {
+        const attachmentName = `photo_${index}`;
+        formData.set(attachmentName, new Blob([toArrayBuffer(dataUrl.bytes)], { type: dataUrl.mimeType }), `${attachmentName}.jpg`);
+        return { type: "photo", media: `attach://${attachmentName}` };
+      }
+
+      if (!isHttpUrl(imageUrl)) {
+        throw new AppError("Invalid Telegram media URL", 400, "TELEGRAM_INVALID_MEDIA_URL");
+      }
+
+      return { type: "photo", media: imageUrl };
+    });
+
+    formData.set("media", JSON.stringify(media));
+
+    const response = await fetch(`https://api.telegram.org/bot${token}/sendMediaGroup`, {
+      method: "POST",
+      body: formData,
+      signal: AbortSignal.timeout(TELEGRAM_REQUEST_TIMEOUT_MS),
+    });
+
+    if (!response.ok) {
+      const payload = (await response.json().catch(() => null)) as TelegramApiErrorPayload | null;
+      throw new AppError(payload?.description ?? `Telegram API returned ${response.status}`, 502, "TELEGRAM_SEND_MEDIA_GROUP_FAILED");
+    }
+
+    const savedMessage = await this.repository.saveOutgoingMessage({
+      atendimentoId: options?.atendimentoId,
+      chatId,
+      text: `Galeria de produto (${limitedImages.length} foto${limitedImages.length === 1 ? "" : "s"})`,
+      type: "image",
+      statusEntrega: "ENVIADA",
+      sender: options?.sender ?? "CHATBOT",
+      status: options?.status,
+      handoffRequested: options?.handoffRequested,
+      intent: options?.intent,
+      stage: options?.stage,
+    });
+
+    if (savedMessage.conversationId) {
+      await this.leadStatusService.updateLeadStatusFromConversation(savedMessage.conversationId);
+    }
+  }
+
+  private async postTelegramPhoto(
+    token: string,
+    chatId: string,
+    photoUrl: string,
+    caption: string,
+    inlineKeyboard?: Array<Array<{ text: string; callbackData: string }>>,
+  ): Promise<Response> {
+    const dataUrl = parseDataUrl(photoUrl);
+    if (dataUrl) {
+      const formData = new FormData();
+      formData.set("chat_id", chatId);
+      formData.set("photo", new Blob([toArrayBuffer(dataUrl.bytes)], { type: dataUrl.mimeType }), "product.jpg");
+      formData.set("caption", caption);
+      const replyMarkup = this.buildReplyMarkup(inlineKeyboard);
+      if (replyMarkup) {
+        formData.set("reply_markup", JSON.stringify(replyMarkup));
+      }
+
+      return fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
+        method: "POST",
+        body: formData,
+        signal: AbortSignal.timeout(TELEGRAM_REQUEST_TIMEOUT_MS),
+      });
+    }
+
+    if (!isHttpUrl(photoUrl)) {
+      throw new AppError("Invalid Telegram photo URL", 400, "TELEGRAM_INVALID_PHOTO_URL");
+    }
+
+    return fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        chat_id: chatId,
+        photo: photoUrl,
+        caption,
+        reply_markup: this.buildReplyMarkup(inlineKeyboard),
+      }),
+      signal: AbortSignal.timeout(TELEGRAM_REQUEST_TIMEOUT_MS),
+    });
   }
 
   private getBotToken(): string {

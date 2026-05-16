@@ -1,12 +1,13 @@
 import { useMemo, useState } from "react";
 import type { DateRange } from "react-day-picker";
-import { Search, Download } from "lucide-react";
+import { Search, Download, ListTree } from "lucide-react";
 import { toast } from "sonner";
 import { DateRangePicker } from "../components/DateRangePicker";
 import { StatusBadge } from "../components/StatusBadge";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { useLeadsData } from "../hooks/useAdminData";
 import { adminDataService } from "../services/adminDataService";
@@ -26,6 +27,7 @@ export function Leads() {
   const [statusFilter, setStatusFilter] = useState("todos");
   const [periodo, setPeriodo] = useState<DateRange | undefined>(undefined);
   const [statusByLeadId, setStatusByLeadId] = useState<Record<number, LeadStatus>>({});
+  const [selectedInterestLead, setSelectedInterestLead] = useState<Lead | null>(null);
 
   const isLeadStatus = (value: string): value is LeadStatus => {
     return ["NOVO", "ENCAMINHADO_HUMANO", "EM_CONTATO", "CONVERTIDO", "PERDIDO"].includes(value);
@@ -36,8 +38,7 @@ export function Leads() {
 
   const formatChannel = (lead: Lead) => {
     if (lead.canal === "telegram") return "Telegram";
-    if (lead.canal === "whatsapp") return "WhatsApp";
-    return lead.origem ?? "Sem canal";
+    return lead.origem === "TELEGRAM" ? "Telegram" : "Sem canal";
   };
 
   const formatDateTime = (value?: string) => {
@@ -197,11 +198,22 @@ export function Leads() {
                     <TableCell>{formatChannel(lead)}</TableCell>
                     <TableCell>{lead.contatoExibicao ?? lead.contato ?? lead.telefone}</TableCell>
                     <TableCell>
-                      <div className="flex max-w-md flex-wrap gap-1">
-                        {splitInteresses(lead.interesse).map((interesse) => (
-                          <span key={interesse} className="rounded bg-gray-100 px-2 py-1 text-sm">{interesse}</span>
-                        ))}
-                      </div>
+                      {splitInteresses(lead.interesse).length > 0 ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8 justify-start"
+                          onClick={() => setSelectedInterestLead(lead)}
+                        >
+                          <ListTree className="mr-2 h-4 w-4" />
+                          {splitInteresses(lead.interesse).length === 1
+                            ? "1 interesse"
+                            : `${splitInteresses(lead.interesse).length} interesses`}
+                        </Button>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">Sem interesse</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-sm">
                       <div>{lead.origem ?? "-"}</div>
@@ -243,6 +255,40 @@ export function Leads() {
           </div>
         </div>
       )}
+
+      <Dialog open={Boolean(selectedInterestLead)} onOpenChange={(open) => !open && setSelectedInterestLead(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Linha do tempo de interesses</DialogTitle>
+            <DialogDescription>
+              {selectedInterestLead
+                ? `${selectedInterestLead.nome} demonstrou os interesses abaixo durante o atendimento.`
+                : "Interesses registrados durante o atendimento."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="max-h-[60vh] overflow-y-auto pr-1">
+            <div className="space-y-0">
+              {splitInteresses(selectedInterestLead?.interesse).map((interesse, index, items) => (
+                <div key={`${interesse}-${index}`} className="grid grid-cols-[24px_minmax(0,1fr)] gap-3">
+                  <div className="flex flex-col items-center">
+                    <div className="mt-1 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-semibold text-white">
+                      {index + 1}
+                    </div>
+                    {index < items.length - 1 && <div className="h-full min-h-7 w-px bg-gray-200" />}
+                  </div>
+                  <div className="pb-5">
+                    <p className="text-sm font-medium text-gray-900">{interesse}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {index === 0 ? "Primeiro interesse registrado" : `Interesse registrado depois do item ${index}`}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

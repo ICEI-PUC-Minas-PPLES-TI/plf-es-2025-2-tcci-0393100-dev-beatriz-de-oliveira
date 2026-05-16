@@ -43,7 +43,6 @@ export class LeadStatusService {
           a.estado_conversa,
           CASE
             WHEN upper(a.canal) = 'TELEGRAM' THEN a.telegram_chat_id
-            WHEN upper(a.canal) = 'WHATSAPP' THEN a.whatsapp_chat_id
           END AS contato,
           COALESCE(a.ultima_interacao_em, a.iniciado_em) AS ultima_interacao_em,
           EXISTS (
@@ -61,6 +60,7 @@ export class LeadStatusService {
         FROM atendimentos a
         LEFT JOIN clientes c ON c.cliente_id = a.cliente_id
         WHERE abs(hashtext(a.atendimento_id::text)) = $1
+          AND upper(a.canal) = 'TELEGRAM'
         LIMIT 1
       `,
       [conversationId],
@@ -79,8 +79,8 @@ export class LeadStatusService {
     const leadId = row.lead_id ?? (await this.findLeadId(row.canal, contact, row.cliente_telefone));
     const status = this.resolveLeadStatus(row);
     const interest = this.resolveInterest(row);
-    const origin = row.canal === "TELEGRAM" ? "TELEGRAM" : "WHATSAPP";
-    const name = row.cliente_nome ?? (row.canal === "TELEGRAM" ? "Cliente Telegram" : "Contato WhatsApp");
+    const origin = "TELEGRAM";
+    const name = row.cliente_nome ?? "Cliente Telegram";
 
     if (leadId) {
       await pool.query(
@@ -125,11 +125,7 @@ export class LeadStatusService {
   }
 
   private resolveContact(row: ConversationLeadSyncRow): string | null {
-    if (row.canal === "TELEGRAM") {
-      return row.contato?.trim() || row.cliente_telefone?.replace(/^telegram:/, "").trim() || null;
-    }
-
-    return row.contato?.trim() || row.cliente_telefone?.trim() || null;
+    return row.contato?.trim() || row.cliente_telefone?.replace(/^telegram:/, "").trim() || null;
   }
 
   private async findLeadId(channel: string, contact: string, customerPhone: string | null): Promise<string | null> {

@@ -8,7 +8,6 @@ import { metricsRoutes } from "../modules/metrics/metrics.routes.js";
 import { productsRoutes } from "../modules/products/products.routes.js";
 import { promotionsRoutes } from "../modules/promotions/promotions.routes.js";
 import { telegramWebhookRoutes } from "../modules/telegram/telegram.routes.js";
-import { whatsAppInboxRoutes, whatsAppWebhookRoutes } from "../modules/whatsapp/whatsapp.routes.js";
 import { authMiddleware } from "../middleware/auth.middleware.js";
 import { authorizeRoles } from "../middleware/role.middleware.js";
 
@@ -43,7 +42,6 @@ export async function registerRoutes(fastify: FastifyInstance) {
     await protectedScope.register(billingRoutes, { prefix: "/billing-rules" });
     await protectedScope.register(billingRoutes, { prefix: "/billing" });
     await protectedScope.register(conversationsRoutes, { prefix: "/conversations" });
-    await protectedScope.register(whatsAppInboxRoutes, { prefix: "/whatsapp" });
 
     await protectedScope.register(async (ownerScope) => {
       ownerScope.addHook("preHandler", authorizeRoles(["PROPRIETARIO"]));
@@ -51,6 +49,5 @@ export async function registerRoutes(fastify: FastifyInstance) {
     });
   });
 
-  await fastify.register(whatsAppWebhookRoutes, { prefix: "/webhooks" });
   await fastify.register(telegramWebhookRoutes, { prefix: "/webhooks" });
 }

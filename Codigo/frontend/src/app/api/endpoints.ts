@@ -15,9 +15,4 @@ export const API_ENDPOINTS = {
   conversationPrevious: (conversationId: number) => `/conversations/${conversationId}/previous`,
   conversationSendMessage: (conversationId: number) => `/conversations/${conversationId}/messages`,
   conversationStatus: (conversationId: number) => `/conversations/${conversationId}/status`,
-  whatsappConversations: "/whatsapp/conversations",
-  whatsappMessages: (atendimentoId: number) => `/whatsapp/messages/${atendimentoId}`,
-  whatsappSend: "/whatsapp/send",
-  whatsappConversationStatus: (atendimentoId: number) => `/whatsapp/conversations/${atendimentoId}/status`,
-  webhooksWhatsApp: "/webhooks/whatsapp",
 } as const;

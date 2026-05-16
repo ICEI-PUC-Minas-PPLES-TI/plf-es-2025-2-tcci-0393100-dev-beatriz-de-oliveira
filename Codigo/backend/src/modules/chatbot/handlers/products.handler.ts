@@ -26,6 +26,10 @@ function wantsProductDetails(normalizedText: string): boolean {
   return normalizedText.includes("ver mais") || normalizedText.includes("detalhes");
 }
 
+function wantsMoreProductPhotos(normalizedText: string): boolean {
+  return normalizedText.includes("ver mais fotos") || normalizedText.includes("mais fotos") || normalizedText.includes("galeria");
+}
+
 function buildProductListLines(products: Produto[]): string {
   return products
     .slice(0, 3)
@@ -122,6 +126,29 @@ export class ProductsHandler implements IntentHandler {
 
     if (context.state.stage === "AGUARDANDO_ESCOLHA_PRODUTO" && context.selectedProductName) {
       const selectedProduct = available.find((product) => product.nome === context.selectedProductName);
+      if (selectedProduct && wantsMoreProductPhotos(context.message.normalizedText)) {
+        const replyText = `Separei mais fotos de ${selectedProduct.nome}.`;
+        return {
+          intent: this.intent,
+          handler: "ProductsHandler",
+          replyText,
+          replyMessages: [replyText],
+          actions: ["product_gallery"],
+          handoffRequested: false,
+          telegram: {
+            inlineKeyboard: buildProductActionsKeyboard(selectedProduct.nome, { hasMoreImages: (selectedProduct.images?.length ?? 0) > 1 }),
+          },
+          stateTransition: {
+            stage: "AGUARDANDO_ESCOLHA_PRODUTO",
+            awaitingProductSelectionForInterest: false,
+            lastShownProducts: [selectedProduct.nome],
+            lastSuggestedCategories: context.state.lastSuggestedCategories,
+            selectedCategoryName: context.state.selectedCategoryName,
+            selectedProductName: selectedProduct.nome,
+          },
+        };
+      }
+
       if (selectedProduct && wantsProductDetails(context.message.normalizedText)) {
         const replyText = `${buildProductDetailsReply(selectedProduct)}\n\n${buildCommercialHandoffText()}`;
         return {
@@ -132,7 +159,7 @@ export class ProductsHandler implements IntentHandler {
           actions: ["product_details"],
           handoffRequested: false,
           telegram: {
-            inlineKeyboard: buildProductActionsKeyboard(selectedProduct.nome),
+            inlineKeyboard: buildProductActionsKeyboard(selectedProduct.nome, { hasMoreImages: (selectedProduct.images?.length ?? 0) > 1 }),
           },
           stateTransition: {
             stage: "AGUARDANDO_ESCOLHA_PRODUTO",
@@ -278,7 +305,7 @@ export class ProductsHandler implements IntentHandler {
       telegram: {
         inlineKeyboard:
           displayedProducts.length === 1
-            ? buildProductActionsKeyboard(displayedProducts[0]!.nome)
+            ? buildProductActionsKeyboard(displayedProducts[0]!.nome, { hasMoreImages: (displayedProducts[0]!.images?.length ?? 0) > 1 })
             : buildProductListKeyboard(displayedProducts.map((item) => item.nome), {
                 categoryName: categoryMatch.matchedCategory,
                 nextOffset: hasMoreProducts ? offset + displayedProducts.length : undefined,

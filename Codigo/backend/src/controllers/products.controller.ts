@@ -11,7 +11,8 @@ export async function listProductsController(_request: FastifyRequest, reply: Fa
 
 export async function createProductController(request: FastifyRequest, reply: FastifyReply) {
   const body = parseWithSchema(productBodySchema, request.body);
-  const created = await container.productsService.create(body);
+  const imagem = body.imagem ?? body.primaryImage ?? body.images.find((image) => image.principal)?.imageUrl ?? body.images[0]?.imageUrl ?? "";
+  const created = await container.productsService.create({ ...body, imagem });
   return reply.code(201).send({ data: created });
 }
 

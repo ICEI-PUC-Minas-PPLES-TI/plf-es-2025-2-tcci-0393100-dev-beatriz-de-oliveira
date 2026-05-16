@@ -45,10 +45,6 @@ export const router = createBrowserRouter([
         path: "conversas",
         lazy: () => import("./route-modules/conversas.route"),
       },
-      {
-        path: "whatsapp",
-        lazy: () => import("./route-modules/whatsapp.route"),
-      },
     ],
   },
   {

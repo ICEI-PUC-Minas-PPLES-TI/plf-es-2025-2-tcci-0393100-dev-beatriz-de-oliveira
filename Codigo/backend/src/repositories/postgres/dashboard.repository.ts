@@ -77,14 +77,13 @@ export class PostgresDashboardRepository implements DashboardRepository {
                       a.cliente_id::text,
                       NULLIF(CASE
                         WHEN upper(a.canal) = 'TELEGRAM' THEN a.telegram_chat_id
-                        WHEN upper(a.canal) = 'WHATSAPP' THEN a.whatsapp_chat_id
                       END, ''),
                       a.atendimento_id::text
                     )
                   ORDER BY COALESCE(a.ultima_interacao_em, a.iniciado_em) DESC NULLS LAST, a.atendimento_id DESC
                 ) AS row_rank
               FROM atendimentos a
-              WHERE upper(COALESCE(a.canal, '')) IN ('WHATSAPP', 'TELEGRAM')
+              WHERE upper(COALESCE(a.canal, '')) = 'TELEGRAM'
             ) active_attendances
             WHERE row_rank = 1
               AND COALESCE(upper(status), 'ATIVO') IN ('ATIVO', 'PENDENTE')
@@ -212,7 +211,7 @@ export class PostgresDashboardRepository implements DashboardRepository {
             ORDER BY m.xmin::text::bigint DESC, m.data_envio DESC NULLS LAST, m.mensagem_id DESC
             LIMIT 1
         ) lm ON TRUE
-        WHERE upper(COALESCE(a.canal, '')) IN ('WHATSAPP', 'TELEGRAM')
+        WHERE upper(COALESCE(a.canal, '')) = 'TELEGRAM'
           AND ($1::date IS NULL OR DATE(COALESCE(lm.data_envio, a.ultima_interacao_em, a.iniciado_em)) >= $1::date)
           AND ($2::date IS NULL OR DATE(COALESCE(lm.data_envio, a.ultima_interacao_em, a.iniciado_em)) <= $2::date)
         ORDER BY COALESCE(lm.data_envio, a.ultima_interacao_em, a.iniciado_em) DESC NULLS LAST
@@ -271,4 +270,3 @@ export class PostgresDashboardRepository implements DashboardRepository {
     return Boolean(result.rows[0]?.exists);
   }
 }
-

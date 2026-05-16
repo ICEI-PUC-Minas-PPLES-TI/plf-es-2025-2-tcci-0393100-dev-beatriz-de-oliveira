@@ -13,3 +13,17 @@ services:
         value: production
       - key: HOST
         value: 0.0.0.0
+      - key: FRONTEND_URL
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_WEBHOOK_SECRET
+        sync: false
+      - key: AUTH_TOKEN_SECRET
+        sync: false
+      - key: AUTH_ADMIN_EMAIL
+        sync: false
+      - key: AUTH_ADMIN_PASSWORD
+        sync: false

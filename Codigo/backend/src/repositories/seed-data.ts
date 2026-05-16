@@ -1,4 +1,9 @@
-﻿import type { BillingRule, Lead, Metricas, Produto } from "../types/domain.js";
+import type { BillingRule, Lead, Metricas, Produto } from "../types/domain.js";
+
+const productImages = (imageUrl: string) => ({
+  primaryImage: imageUrl,
+  images: [{ imageUrl, ordem: 0, principal: true }],
+});
 
 export const seedProdutos: Produto[] = [
   {
@@ -10,6 +15,7 @@ export const seedProdutos: Produto[] = [
     quantidade: 12,
     disponivel: true,
     imagem: "https://images.unsplash.com/photo-1768946052273-0a2dd7f3e365?w=400",
+    ...productImages("https://images.unsplash.com/photo-1768946052273-0a2dd7f3e365?w=400"),
   },
   {
     id: 2,
@@ -20,6 +26,7 @@ export const seedProdutos: Produto[] = [
     quantidade: 8,
     disponivel: true,
     imagem: "https://images.unsplash.com/photo-1758488438758-5e2eedf769ce?w=400",
+    ...productImages("https://images.unsplash.com/photo-1758488438758-5e2eedf769ce?w=400"),
   },
 ];
 

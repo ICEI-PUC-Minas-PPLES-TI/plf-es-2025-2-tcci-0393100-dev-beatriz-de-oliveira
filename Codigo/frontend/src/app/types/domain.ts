@@ -3,11 +3,20 @@ export type PromocaoTipo = "PROMOCAO" | "DESTAQUE";
 export type PedidoStatus = "PAGO" | "ATRASADO" | "PENDENTE" | "CANCELADO";
 export type AtendimentoStatus = "ATIVO" | "PENDENTE" | "ENCERRADO";
 export type MensagemTipo = "recebida" | "enviada";
-export type ConversationChannel = "whatsapp" | "telegram";
+export type ConversationChannel = "telegram";
 export type BillingSendStatus = "ENVIADO" | "FALHA";
 export type BillingSendType = "AUTOMATICO" | "MANUAL";
 export type BillingChargeKind = "LEMBRETE" | "VENCE_HOJE" | "EM_ATRASO";
 export type DisponibilidadeStatus = "disponivel" | "indisponivel";
+
+export interface ProductImage {
+  id?: number;
+  productId?: number;
+  imageUrl: string;
+  ordem: number;
+  principal: boolean;
+  criadoEm?: string;
+}
 
 export interface Produto {
   id: number;
@@ -18,6 +27,8 @@ export interface Produto {
   quantidade: number;
   disponivel: boolean;
   imagem: string;
+  images: ProductImage[];
+  primaryImage?: string;
 }
 
 export interface Promocao {

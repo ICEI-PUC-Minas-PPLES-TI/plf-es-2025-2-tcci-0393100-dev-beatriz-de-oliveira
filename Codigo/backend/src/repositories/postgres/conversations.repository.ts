@@ -39,14 +39,8 @@ type HistoryMessageRow = MessageRow & {
 export class PostgresConversationsRepository implements ConversationsRepository {
   async listConversations(channel?: string): Promise<Atendimento[]> {
     const values: unknown[] = [];
-    const filter =
-      channel && channel.trim()
-        ? `WHERE lower(a.canal) = $1`
-        : "";
-
-    if (channel && channel.trim()) {
-      values.push(channel.trim().toLowerCase());
-    }
+    values.push("telegram");
+    const filter = `WHERE lower(a.canal) = $1`;
 
     const result = await pool.query<ConversationRow>(
       `
@@ -59,7 +53,6 @@ export class PostgresConversationsRepository implements ConversationsRepository 
             c.telefone,
             CASE
               WHEN upper(a.canal) = 'TELEGRAM' THEN a.telegram_chat_id
-              WHEN upper(a.canal) = 'WHATSAPP' THEN a.whatsapp_chat_id
             END AS contact_id,
             a.status,
             a.canal,
@@ -72,7 +65,6 @@ export class PostgresConversationsRepository implements ConversationsRepository 
               a.cliente_id::text,
               NULLIF(CASE
                 WHEN upper(a.canal) = 'TELEGRAM' THEN a.telegram_chat_id
-                WHEN upper(a.canal) = 'WHATSAPP' THEN a.whatsapp_chat_id
               END, ''),
               NULLIF(c.telefone, ''),
               a.atendimento_id::text
@@ -129,7 +121,7 @@ export class PostgresConversationsRepository implements ConversationsRepository 
       iniciadoEm: row.iniciado_em ?? row.horario ?? new Date().toISOString(),
       encerradoEm: row.encerrado_em,
       ultimaInteracaoEm: row.ultima_interacao_em,
-      channel: row.canal?.toLowerCase() === "telegram" ? "telegram" : "whatsapp",
+      channel: "telegram",
     }));
   }
 
@@ -144,7 +136,9 @@ export class PostgresConversationsRepository implements ConversationsRepository 
           m.direcao,
           m.remetente
         FROM mensagens m
+        INNER JOIN atendimentos a ON a.atendimento_id = m.atendimento_id
         WHERE abs(hashtext(m.atendimento_id::text)) = $1
+          AND upper(a.canal) = 'TELEGRAM'
         ORDER BY m.xmin::text::bigint ASC, m.data_envio ASC NULLS LAST, m.mensagem_id ASC
       `,
       [conversationId],
@@ -167,10 +161,10 @@ export class PostgresConversationsRepository implements ConversationsRepository 
           SELECT
             a.cliente_id,
             a.canal,
-            a.telegram_chat_id,
-            a.whatsapp_chat_id
+            a.telegram_chat_id
           FROM atendimentos a
           WHERE abs(hashtext(a.atendimento_id::text)) = $1
+            AND upper(a.canal) = 'TELEGRAM'
           LIMIT 1
         ),
         related_attendances AS (
@@ -192,13 +186,11 @@ export class PostgresConversationsRepository implements ConversationsRepository 
               AND COALESCE(
                 CASE
                   WHEN upper(a.canal) = 'TELEGRAM' THEN a.telegram_chat_id
-                  WHEN upper(a.canal) = 'WHATSAPP' THEN a.whatsapp_chat_id
                 END,
                 ''
               ) = COALESCE(
                 CASE
                   WHEN upper(current.canal) = 'TELEGRAM' THEN current.telegram_chat_id
-                  WHEN upper(current.canal) = 'WHATSAPP' THEN current.whatsapp_chat_id
                 END,
                 ''
               )
@@ -234,7 +226,7 @@ export class PostgresConversationsRepository implements ConversationsRepository 
       horario: row.data_envio ?? new Date().toISOString(),
       remetente: row.remetente ?? undefined,
       conversationId: row.atendimento_numeric_id,
-      channel: row.canal?.toLowerCase() === "telegram" ? "telegram" : "whatsapp",
+      channel: "telegram",
       type: row.atendimento_status ?? undefined,
       atendimentoIniciadoEm: row.atendimento_iniciado_em ?? undefined,
       atendimentoEncerradoEm: row.atendimento_encerrado_em ?? undefined,
@@ -252,7 +244,6 @@ export class PostgresConversationsRepository implements ConversationsRepository 
           c.telefone,
           CASE
             WHEN upper(a.canal) = 'TELEGRAM' THEN a.telegram_chat_id
-            WHEN upper(a.canal) = 'WHATSAPP' THEN a.whatsapp_chat_id
           END AS contact_id,
           a.status,
           a.canal,
@@ -271,6 +262,7 @@ export class PostgresConversationsRepository implements ConversationsRepository 
           LIMIT 1
         ) lm ON TRUE
         WHERE abs(hashtext(a.atendimento_id::text)) = $1
+          AND upper(a.canal) = 'TELEGRAM'
         LIMIT 1
       `,
       [conversationId],
@@ -281,7 +273,7 @@ export class PostgresConversationsRepository implements ConversationsRepository 
       return null;
     }
 
-    const channel = row.canal?.toLowerCase() === "telegram" ? "telegram" : "whatsapp";
+    const channel = "telegram";
 
     return {
       id: Number(row.numeric_id),
@@ -306,10 +298,10 @@ export class PostgresConversationsRepository implements ConversationsRepository 
             a.atendimento_id,
             a.cliente_id,
             a.canal,
-            a.telegram_chat_id,
-            a.whatsapp_chat_id
+            a.telegram_chat_id
           FROM atendimentos a
           WHERE abs(hashtext(a.atendimento_id::text)) = $1
+            AND upper(a.canal) = 'TELEGRAM'
           LIMIT 1
         )
         SELECT
@@ -320,7 +312,6 @@ export class PostgresConversationsRepository implements ConversationsRepository 
           c.telefone,
           CASE
             WHEN upper(a.canal) = 'TELEGRAM' THEN a.telegram_chat_id
-            WHEN upper(a.canal) = 'WHATSAPP' THEN a.whatsapp_chat_id
           END AS contact_id,
           a.status,
           a.canal,
@@ -348,13 +339,11 @@ export class PostgresConversationsRepository implements ConversationsRepository 
               AND COALESCE(
                 CASE
                   WHEN upper(a.canal) = 'TELEGRAM' THEN a.telegram_chat_id
-                  WHEN upper(a.canal) = 'WHATSAPP' THEN a.whatsapp_chat_id
                 END,
                 ''
               ) = COALESCE(
                 CASE
                   WHEN upper(current.canal) = 'TELEGRAM' THEN current.telegram_chat_id
-                  WHEN upper(current.canal) = 'WHATSAPP' THEN current.whatsapp_chat_id
                 END,
                 ''
               )
@@ -416,7 +405,7 @@ export class PostgresConversationsRepository implements ConversationsRepository 
       iniciadoEm: row.iniciado_em ?? row.horario ?? new Date().toISOString(),
       encerradoEm: row.encerrado_em,
       ultimaInteracaoEm: row.ultima_interacao_em,
-      channel: row.canal?.toLowerCase() === "telegram" ? "telegram" : "whatsapp",
+      channel: "telegram",
       messages: groupedMessages.get(row.atendimento_id) ?? [],
     }));
   }

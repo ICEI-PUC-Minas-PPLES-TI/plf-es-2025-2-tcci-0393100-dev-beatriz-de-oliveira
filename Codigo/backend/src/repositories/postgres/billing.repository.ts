@@ -26,7 +26,6 @@ type OrderRow = {
   latest_channel: string | null;
   latest_attendance_contact_id: string | null;
   latest_telegram_chat_id: string | null;
-  latest_whatsapp_chat_id: string | null;
   numero_pedido: string | null;
   produto_id: number | null;
   produto_nome: string | null;
@@ -57,7 +56,7 @@ type BillingRunRow = {
   itens: BillingRoutineEntry[] | string | null;
 };
 
-type SendChannel = "whatsapp" | "telegram";
+type SendChannel = "telegram";
 type DeliveryTarget = {
   available: boolean;
   channel?: SendChannel;
@@ -483,7 +482,6 @@ export class PostgresBillingRepository implements BillingRepository {
         latest_attendance.canal AS latest_channel,
         latest_attendance.contact_id AS latest_attendance_contact_id,
         CASE WHEN latest_attendance.canal = 'telegram' THEN latest_attendance.contact_id END AS latest_telegram_chat_id,
-        CASE WHEN latest_attendance.canal = 'whatsapp' THEN latest_attendance.contact_id END AS latest_whatsapp_chat_id,
         m.numero_pedido,
         order_product.produto_id,
         order_product.produto_nome,
@@ -539,10 +537,10 @@ export class PostgresBillingRepository implements BillingRepository {
           lower(a.canal) AS canal,
           CASE
             WHEN upper(a.canal) = 'TELEGRAM' THEN a.telegram_chat_id
-            WHEN upper(a.canal) = 'WHATSAPP' THEN a.whatsapp_chat_id
           END AS contact_id
         FROM atendimentos a
         WHERE a.cliente_id = p.cliente_id
+          AND upper(a.canal) = 'TELEGRAM'
         ORDER BY COALESCE(a.ultima_interacao_em, a.iniciado_em) DESC NULLS LAST
         LIMIT 1
       ) latest_attendance ON TRUE
@@ -607,7 +605,7 @@ export class PostgresBillingRepository implements BillingRepository {
   }
 
   private resolveDeliveryTarget(
-    row: Pick<OrderRow, "numeric_id" | "cliente_uuid" | "latest_channel" | "latest_attendance_contact_id" | "latest_telegram_chat_id" | "latest_whatsapp_chat_id">,
+    row: Pick<OrderRow, "numeric_id" | "cliente_uuid" | "latest_channel" | "latest_attendance_contact_id" | "latest_telegram_chat_id">,
   ): DeliveryTarget {
     const latestChannel = row.latest_channel?.trim().toLowerCase() ?? null;
     const latestAttendanceContactId = row.latest_attendance_contact_id?.trim();
@@ -723,7 +721,7 @@ export class PostgresBillingRepository implements BillingRepository {
   }
 
   private logResolvedDeliveryTarget(
-    row: Pick<OrderRow, "numeric_id" | "cliente_uuid" | "latest_channel" | "latest_telegram_chat_id" | "latest_whatsapp_chat_id">,
+    row: Pick<OrderRow, "numeric_id" | "cliente_uuid" | "latest_channel" | "latest_telegram_chat_id">,
     result: DeliveryTarget,
   ): void {
     console.info("[BillingChannelStrictResolve]", {
@@ -731,7 +729,6 @@ export class PostgresBillingRepository implements BillingRepository {
       cliente_id: row.cliente_uuid ?? null,
       canal_ultimo_atendimento: row.latest_channel ?? null,
       telegram_chat_id: row.latest_telegram_chat_id ?? null,
-      whatsapp_chat_id: row.latest_whatsapp_chat_id ?? null,
       canal_final: result.channel ?? null,
       telegramChatId_final: result.telegramChatId ?? null,
       contatoExibicao_final: result.displayTarget,

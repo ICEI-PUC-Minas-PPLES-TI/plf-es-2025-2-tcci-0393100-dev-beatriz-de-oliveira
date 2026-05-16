@@ -37,8 +37,8 @@ type PromotionPayload = Omit<Promocao, "id">;
 type OrderPayload = Omit<Pedido, "id">;
 let mockBillingRule: BillingRule = clone(BILLING_RULE);
 
-function normalizeConversationChannel(channel?: string): ConversationChannel {
-  return channel?.toUpperCase() === "TELEGRAM" || channel?.toLowerCase() === "telegram" ? "telegram" : "whatsapp";
+function normalizeConversationChannel(_channel?: string): ConversationChannel {
+  return "telegram";
 }
 
 function normalizeConversation(conversation: Atendimento): Atendimento {
@@ -276,14 +276,14 @@ export const adminDataService = {
 
   listAtendimentos: () =>
     getMockOrApiData<Atendimento[]>(
-      () => ATENDIMENTOS,
-      async () => (await httpClient.get<ApiListResponse<Atendimento>>(API_ENDPOINTS.whatsappConversations)).data,
+      () => ATENDIMENTOS.filter((atendimento) => normalizeConversationChannel(atendimento.channel) === "telegram"),
+      async () => (await httpClient.get<ApiListResponse<Atendimento>>(API_ENDPOINTS.conversations)).data,
     ),
 
   listMensagens: (atendimentoId: number) =>
     getMockOrApiData<Mensagem[]>(
       () => MENSAGENS,
-      async () => (await httpClient.get<ApiListResponse<Mensagem>>(API_ENDPOINTS.whatsappMessages(atendimentoId))).data,
+      async () => (await httpClient.get<ApiListResponse<Mensagem>>(API_ENDPOINTS.conversationMessages(atendimentoId))).data,
     ),
 
   listConversations: (channel?: ConversationChannel | "todos") =>
@@ -343,7 +343,7 @@ export const adminDataService = {
         return updated;
       },
       async () =>
-        (await httpClient.patch<ApiItemResponse<Atendimento>>(API_ENDPOINTS.whatsappConversationStatus(atendimentoId), { status })).data,
+        (await httpClient.patch<ApiItemResponse<Atendimento>>(API_ENDPOINTS.conversationStatus(atendimentoId), { status })).data,
     ),
 
   updateConversationStatus: (conversationId: number, status: Atendimento["status"]) =>
@@ -359,22 +359,6 @@ export const adminDataService = {
       },
       async () =>
         (await httpClient.patch<ApiItemResponse<Atendimento>>(API_ENDPOINTS.conversationStatus(conversationId), { status })).data,
-    ),
-
-  sendWhatsAppMessage: (payload: { atendimentoId?: number; telefone?: string; texto: string }) =>
-    getMockOrApiData<Mensagem>(
-      () => {
-        const nextId = Math.max(0, ...MENSAGENS.map((item) => item.id)) + 1;
-        const created: Mensagem = {
-          id: nextId,
-          tipo: "enviada",
-          conteudo: payload.texto,
-          horario: new Date().toISOString(),
-        };
-        MENSAGENS.push(created);
-        return created;
-      },
-      async () => (await httpClient.post<ApiItemResponse<Mensagem>>(API_ENDPOINTS.whatsappSend, payload)).data,
     ),
 
   getMetricas: (periodo?: DateRange) =>

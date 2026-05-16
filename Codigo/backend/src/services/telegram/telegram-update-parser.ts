@@ -114,6 +114,10 @@ function mapCallbackDataToText(data?: string): string | null {
     return `ver mais ${trimmed.slice("PRODUCT:MORE:".length).trim()}`;
   }
 
+  if (normalized.startsWith("product:photos:")) {
+    return `ver mais fotos ${trimmed.slice("PRODUCT:PHOTOS:".length).trim()}`;
+  }
+
   if (normalized.startsWith("product:interest:")) {
     return `tenho interesse em ${trimmed.slice("PRODUCT:INTEREST:".length).trim()}`;
   }

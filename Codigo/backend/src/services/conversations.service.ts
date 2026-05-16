@@ -1,17 +1,15 @@
 import type { ConversationsRepository } from "../repositories/conversations.repository.js";
 import type { TelegramService } from "./telegram.service.js";
-import type { WhatsAppService } from "./whatsapp.service.js";
 import { AppError } from "../utils/app-error.js";
 
 export class ConversationsService {
   constructor(
     private readonly repository: ConversationsRepository,
-    private readonly whatsappService: WhatsAppService,
     private readonly telegramService: TelegramService,
   ) {}
 
   listConversations(channel?: string) {
-    return this.repository.listConversations(channel);
+    return this.repository.listConversations("telegram");
   }
 
   listMessages(conversationId: number) {
@@ -55,24 +53,21 @@ export class ConversationsService {
         phone: conversation.telefone ?? null,
       });
 
-      const channel = conversation.channel === "telegram" ? "telegram" : "whatsapp";
+      if (conversation.channel !== "telegram") {
+        throw new AppError("Conversation channel unavailable", 400, "CONVERSATION_CHANNEL_UNAVAILABLE");
+      }
+
+      const channel = "telegram";
       console.info("[ConversationsManualSend] canal", {
         conversationId,
         channel,
       });
 
-      const data =
-        channel === "telegram"
-          ? await this.telegramService.sendManualMessage({
-              atendimentoId: conversationId,
-              chatId: conversation.contactId ?? conversation.telefone,
-              texto: content,
-            })
-          : await this.whatsappService.sendManualMessage({
-              atendimentoId: conversationId,
-              telefone: conversation.telefone,
-              texto: content,
-            });
+      const data = await this.telegramService.sendManualMessage({
+        atendimentoId: conversationId,
+        chatId: conversation.contactId ?? conversation.telefone,
+        texto: content,
+      });
 
       console.info("[ConversationsManualSend] envio OK", {
         conversationId,
@@ -114,10 +109,10 @@ export class ConversationsService {
       throw new AppError("Conversation not found", 404, "CONVERSATION_NOT_FOUND");
     }
 
-    if (conversation.channel === "telegram") {
-      return this.telegramService.updateConversationStatus(conversationId, status);
+    if (conversation.channel !== "telegram") {
+      throw new AppError("Conversation channel unavailable", 400, "CONVERSATION_CHANNEL_UNAVAILABLE");
     }
 
-    return this.whatsappService.updateConversationStatus(conversationId, status);
+    return this.telegramService.updateConversationStatus(conversationId, status);
   }
 }

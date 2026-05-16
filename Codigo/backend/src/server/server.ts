@@ -12,7 +12,7 @@ export async function buildServer() {
     logger: env.NODE_ENV !== "test",
     bodyLimit: 25 * 1024 * 1024,
   });
-  const allowedOrigins = env.CORS_ORIGIN.split(",")
+  const allowedOrigins = env.FRONTEND_URL.split(",")
     .map((origin) => origin.trim())
     .filter(Boolean);
 
@@ -42,7 +42,7 @@ export async function buildServer() {
     openapi: {
       info: {
         title: "Chatbot Atendimento API",
-        description: "API do sistema de chatbot para atendimento via WhatsApp",
+        description: "API do sistema de chatbot para atendimento via Telegram",
         version: "1.0.0",
       },
       tags: [
@@ -54,10 +54,8 @@ export async function buildServer() {
         { name: "Leads", description: "CRM e acompanhamento de leads" },
         { name: "Metrics", description: "Metricas e desempenho comercial" },
         { name: "Billing", description: "Regras, pedidos e rotina de cobranca" },
-        { name: "Conversations", description: "Inbox unificado de conversas por canal" },
+        { name: "Conversations", description: "Inbox de conversas do Telegram" },
         { name: "Telegram Webhook", description: "Recebimento de eventos do Telegram" },
-        { name: "WhatsApp Webhook", description: "Recebimento e verificacao de eventos do WhatsApp" },
-        { name: "WhatsApp Inbox", description: "Inbox e gestao de conversas do WhatsApp" },
       ],
       components: {
         securitySchemes: {
@@ -108,4 +106,3 @@ start().catch((error) => {
   console.error(error);
   process.exit(1);
 });
-

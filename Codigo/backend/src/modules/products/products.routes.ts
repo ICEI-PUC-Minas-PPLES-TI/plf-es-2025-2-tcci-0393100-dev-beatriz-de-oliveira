@@ -17,12 +17,27 @@ const productSchema = {
     quantidade: { type: "number" },
     disponivel: { type: "boolean" },
     imagem: { type: "string" },
+    primaryImage: { type: "string" },
+    images: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          id: { type: "number" },
+          productId: { type: "number" },
+          imageUrl: { type: "string" },
+          ordem: { type: "number" },
+          principal: { type: "boolean" },
+          criadoEm: { type: "string" },
+        },
+      },
+    },
   },
 };
 
 const productBodySchema = {
   type: "object",
-  required: ["nome", "categoria", "descricao", "preco", "disponivel", "imagem"],
+  required: ["nome", "categoria", "descricao", "preco", "disponivel"],
   properties: {
     nome: { type: "string" },
     categoria: { type: "string" },
@@ -30,7 +45,23 @@ const productBodySchema = {
     preco: { type: "string" },
     quantidade: { type: "number", minimum: 0 },
     disponivel: { type: "boolean" },
-    imagem: { type: "string", format: "uri" },
+    imagem: { type: "string" },
+    primaryImage: { type: "string" },
+    images: {
+      type: "array",
+      items: {
+        type: "object",
+        required: ["imageUrl"],
+        properties: {
+          id: { type: "number" },
+          productId: { type: "number" },
+          imageUrl: { type: "string" },
+          ordem: { type: "number", minimum: 0 },
+          principal: { type: "boolean" },
+          criadoEm: { type: "string" },
+        },
+      },
+    },
   },
 };
 

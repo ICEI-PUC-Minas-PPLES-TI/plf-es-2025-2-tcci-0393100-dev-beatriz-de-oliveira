@@ -9,7 +9,6 @@ import { PostgresConversationsRepository } from "../repositories/postgres/conver
 import { PostgresProductsRepository } from "../repositories/postgres/products.repository.js";
 import { PostgresPromotionsRepository } from "../repositories/postgres/promotions.repository.js";
 import { PostgresTelegramRepository } from "../repositories/postgres/telegram.repository.js";
-import { PostgresWhatsAppRepository } from "../repositories/postgres/whatsapp.repository.js";
 import { AuthService } from "../services/auth.service.js";
 import { BillingService } from "../services/billing.service.js";
 import { ConversationsService } from "../services/conversations.service.js";
@@ -20,7 +19,6 @@ import { MetricsService } from "../services/metrics.service.js";
 import { ProductsService } from "../services/products.service.js";
 import { PromotionsService } from "../services/promotions.service.js";
 import { TelegramService } from "../services/telegram.service.js";
-import { WhatsAppService } from "../services/whatsapp.service.js";
 
 const authRepository = new PostgresAuthRepository();
 const productsRepository = new PostgresProductsRepository();
@@ -29,7 +27,6 @@ const leadsRepository = new PostgresLeadsRepository();
 const metricsRepository = new PostgresMetricsRepository();
 const billingRepository = new PostgresBillingRepository();
 const dashboardRepository = new PostgresDashboardRepository();
-const whatsappRepository = new PostgresWhatsAppRepository();
 const telegramRepository = new PostgresTelegramRepository();
 const conversationsRepository = new PostgresConversationsRepository();
 
@@ -42,10 +39,9 @@ const chatbotCoreService = new ChatbotCoreService({
   promotionsService,
   leadsService,
 });
-const whatsappService = new WhatsAppService(chatbotCoreService, whatsappRepository, leadStatusService);
 const telegramService = new TelegramService(chatbotCoreService, productsService, telegramRepository, leadStatusService);
-const conversationsService = new ConversationsService(conversationsRepository, whatsappService, telegramService);
-const billingService = new BillingService(billingRepository, whatsappService, telegramService);
+const conversationsService = new ConversationsService(conversationsRepository, telegramService);
+const billingService = new BillingService(billingRepository, telegramService);
 
 export const container = {
   authService: new AuthService(authRepository),
@@ -59,6 +55,5 @@ export const container = {
   leadStatusService,
   dailyBillingJob: new DailyBillingJob(billingService),
   chatbotCoreService,
-  whatsappService,
   telegramService,
 };

@@ -5,7 +5,7 @@ export interface LeadUpsertByPhoneInput {
   name?: string;
   interest?: string;
   status: Lead["status"];
-  channel?: "whatsapp" | "telegram";
+  channel?: "telegram";
   conversationId?: number;
 }
 

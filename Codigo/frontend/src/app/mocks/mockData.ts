@@ -12,6 +12,11 @@ import type {
   Promocao,
 } from "../types/domain";
 
+const productImages = (imageUrl: string) => ({
+  primaryImage: imageUrl,
+  images: [{ imageUrl, ordem: 0, principal: true }],
+});
+
 export const PRODUTOS: Produto[] = [
   {
     id: 1,
@@ -22,6 +27,7 @@ export const PRODUTOS: Produto[] = [
     quantidade: 12,
     disponivel: true,
     imagem: "https://images.unsplash.com/photo-1768946052273-0a2dd7f3e365?w=400",
+    ...productImages("https://images.unsplash.com/photo-1768946052273-0a2dd7f3e365?w=400"),
   },
   {
     id: 2,
@@ -32,6 +38,7 @@ export const PRODUTOS: Produto[] = [
     quantidade: 8,
     disponivel: true,
     imagem: "https://images.unsplash.com/photo-1758488438758-5e2eedf769ce?w=400",
+    ...productImages("https://images.unsplash.com/photo-1758488438758-5e2eedf769ce?w=400"),
   },
   {
     id: 3,
@@ -42,6 +49,7 @@ export const PRODUTOS: Produto[] = [
     quantidade: 0,
     disponivel: false,
     imagem: "https://images.unsplash.com/photo-1763132646264-4123ae7cf4a6?w=400",
+    ...productImages("https://images.unsplash.com/photo-1763132646264-4123ae7cf4a6?w=400"),
   },
   {
     id: 4,
@@ -52,6 +60,7 @@ export const PRODUTOS: Produto[] = [
     quantidade: 5,
     disponivel: true,
     imagem: "https://images.unsplash.com/photo-1539624831128-04618668ce81?w=400",
+    ...productImages("https://images.unsplash.com/photo-1539624831128-04618668ce81?w=400"),
   },
   {
     id: 5,
@@ -62,6 +71,7 @@ export const PRODUTOS: Produto[] = [
     quantidade: 3,
     disponivel: true,
     imagem: "https://images.unsplash.com/photo-1631048499455-4f9e26f23b9f?w=400",
+    ...productImages("https://images.unsplash.com/photo-1631048499455-4f9e26f23b9f?w=400"),
   },
 ];
 
@@ -322,6 +332,5 @@ export const DASHBOARD_ATENDIMENTOS_RECENTES: DashboardAtendimentoRecente[] = [
   { id: 2, cliente: "Joao Santos", mensagem: "Qual o prazo de entrega?", hora: "Ha 12 min" },
   { id: 3, cliente: "Ana Costa", mensagem: "Tem desconto para pagamento a vista?", hora: "Ha 25 min" },
 ];
-
 
 

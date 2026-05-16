@@ -6,6 +6,7 @@ export type TelegramProductCard = {
   price: string;
   description?: string;
   imageUrl?: string;
+  images: string[];
 };
 
 export type TelegramPreparedResponse = {
@@ -51,19 +52,21 @@ export function buildTelegramPreparedResponse(
       name: product.nome,
       price: toCurrency(product.preco),
       description: product.descricao?.trim() ? product.descricao.trim().slice(0, 120) : undefined,
-      imageUrl: /^https?:\/\//i.test(product.imagem ?? "") ? product.imagem : undefined,
+      imageUrl: product.primaryImage || product.imagem || product.images?.find((image) => image.principal)?.imageUrl || product.images?.[0]?.imageUrl,
+      images: (product.images?.map((image) => image.imageUrl).filter(Boolean) ?? []).length > 0
+        ? product.images.map((image) => image.imageUrl).filter(Boolean)
+        : [product.primaryImage || product.imagem].filter((image): image is string => Boolean(image)),
     })),
     fallbackText: undefined,
   };
 }
 
 export function buildTelegramPhotoCaption(card: TelegramProductCard): string {
-  const parts = [card.name, card.price];
+  const parts = [`📦 ${card.name}`, `💰 ${card.price}`];
   if (card.description) {
     parts.push(card.description);
   }
-  parts.push("Quer seguir com este produto?");
-  return parts.join("\n");
+  return parts.join("\n\n").slice(0, 1024);
 }
 
 export function buildTelegramTextCard(card: TelegramProductCard): string {

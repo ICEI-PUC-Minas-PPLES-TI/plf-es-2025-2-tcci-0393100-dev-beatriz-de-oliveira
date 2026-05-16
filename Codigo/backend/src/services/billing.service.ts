@@ -1,7 +1,6 @@
 import type { BillingRepository } from "../repositories/billing.repository.js";
 import { env } from "../config/env.js";
 import type { TelegramService } from "./telegram.service.js";
-import type { WhatsAppService } from "./whatsapp.service.js";
 import type { BillingChargeKind, BillingRoutineEntry, BillingRule, BillingRoutineRun, Pedido } from "../types/domain.js";
 import { AppError } from "../utils/app-error.js";
 import { diffInDays } from "../utils/date.js";
@@ -9,7 +8,6 @@ import { diffInDays } from "../utils/date.js";
 export class BillingService {
   constructor(
     private readonly repository: BillingRepository,
-    private readonly whatsappService: WhatsAppService,
     private readonly telegramService: TelegramService,
   ) {}
 

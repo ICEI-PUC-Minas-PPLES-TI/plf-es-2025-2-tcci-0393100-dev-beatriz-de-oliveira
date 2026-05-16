@@ -48,7 +48,6 @@ function mapDomainStatusToDb(status: Lead["status"]): DbLeadStatus {
 function normalizeChannel(value?: string | null): ConversationChannel | undefined {
   const normalized = value?.trim().toLowerCase();
   if (normalized === "telegram") return "telegram";
-  if (normalized === "whatsapp") return "whatsapp";
   return undefined;
 }
 
@@ -71,6 +70,8 @@ export class PostgresLeadsRepository implements LeadsRepository {
       conditions.push(`LOWER(CONCAT_WS(' ', COALESCE(l.nome, ''), l.telefone, COALESCE(l.interesse_produto, ''), l.origem, COALESCE(latest.ultima_intencao, ''))) LIKE $${values.length}`);
     }
 
+    conditions.push(`upper(l.origem) = 'TELEGRAM'`);
+
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
     const query = `
       ${this.buildLeadSelectSql()}
@@ -88,6 +89,7 @@ export class PostgresLeadsRepository implements LeadsRepository {
     const query = `
       ${this.buildLeadSelectSql()}
       WHERE ${LEAD_ID_SQL.replaceAll("lead_id", "l.lead_id")} = $1
+        AND upper(l.origem) = 'TELEGRAM'
       LIMIT 1
     `;
 
@@ -183,7 +185,7 @@ export class PostgresLeadsRepository implements LeadsRepository {
         ORDER BY CASE WHEN telefone = $1 THEN 0 ELSE 1 END, atualizado_em DESC NULLS LAST, criado_em DESC
         LIMIT 1
       `,
-      [input.phone, input.channel ?? "whatsapp"],
+      [input.phone, input.channel ?? "telegram"],
     );
 
     const existingRow = existing.rows[0];
@@ -271,25 +273,18 @@ export class PostgresLeadsRepository implements LeadsRepository {
           lower(a.canal) AS atendimento_canal,
           CASE
             WHEN upper(a.canal) = 'TELEGRAM' THEN a.telegram_chat_id
-            WHEN upper(a.canal) = 'WHATSAPP' THEN a.whatsapp_chat_id
           END AS contato,
           a.ultima_intencao,
           COALESCE(a.ultima_interacao_em, a.iniciado_em) AS ultima_interacao_em,
           a.encaminhado_humano
         FROM atendimentos a
         LEFT JOIN clientes c ON c.cliente_id = a.cliente_id
-        WHERE a.lead_id = l.lead_id
-          OR (
-            upper(a.canal) = 'TELEGRAM'
-            AND (
-              a.telegram_chat_id = l.telefone
-              OR c.telefone = concat('telegram:', l.telefone)
-              OR c.telefone = l.telefone
-            )
-          )
-          OR (
-            upper(a.canal) = 'WHATSAPP'
-            AND (a.whatsapp_chat_id = l.telefone OR c.telefone = l.telefone)
+        WHERE upper(a.canal) = 'TELEGRAM'
+          AND (
+            a.lead_id = l.lead_id
+            OR a.telegram_chat_id = l.telefone
+            OR c.telefone = concat('telegram:', l.telefone)
+            OR c.telefone = l.telefone
           )
         ORDER BY COALESCE(a.ultima_interacao_em, a.iniciado_em) DESC NULLS LAST
         LIMIT 1
@@ -297,12 +292,12 @@ export class PostgresLeadsRepository implements LeadsRepository {
     `;
   }
 
-  private resolveOrigin(channel?: "whatsapp" | "telegram"): string {
-    return channel === "telegram" ? "TELEGRAM" : "WHATSAPP";
+  private resolveOrigin(_channel?: "telegram"): string {
+    return "TELEGRAM";
   }
 
-  private defaultName(channel?: "whatsapp" | "telegram"): string {
-    return channel === "telegram" ? "Cliente Telegram" : "Contato WhatsApp";
+  private defaultName(_channel?: "telegram"): string {
+    return "Cliente Telegram";
   }
 
   private normalizeCommercialInterest(value?: string | null): string | null {
@@ -360,8 +355,8 @@ export class PostgresLeadsRepository implements LeadsRepository {
 
   private extractOriginFromEmail(email: string): string {
     const domain = email.split("@")[1]?.toUpperCase();
-    if (!domain || domain === "WHATSAPP.LOCAL") {
-      return "WHATSAPP";
+    if (!domain) {
+      return "TELEGRAM";
     }
     return domain.replace(/\.LOCAL$/i, "") || "PAINEL_ADMIN";
   }

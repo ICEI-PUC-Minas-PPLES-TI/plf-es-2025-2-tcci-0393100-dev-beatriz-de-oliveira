@@ -12,7 +12,7 @@ export async function conversationsRoutes(fastify: FastifyInstance) {
         querystring: {
           type: "object",
           properties: {
-            channel: { type: "string", enum: ["whatsapp", "telegram"] },
+            channel: { type: "string", enum: ["telegram"] },
           },
         },
       },
