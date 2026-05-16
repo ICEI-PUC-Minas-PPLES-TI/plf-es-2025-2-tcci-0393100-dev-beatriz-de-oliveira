@@ -118,11 +118,15 @@ function buildSearchInput(originalText: string): ProductSearchInput {
 }
 
 function shouldSkipProductLookup(searchInput: ProductSearchInput): boolean {
-  if (searchInput.normalizedExactPhrase.length < 4) {
+  if (searchInput.normalizedExactPhrase.length < 2) {
     return true;
   }
 
   if (PRODUCT_SEARCH_STOPWORDS.has(searchInput.normalizedExactPhrase)) {
+    return true;
+  }
+
+  if (searchInput.normalizedExactPhrase.length < 4 && tokenizeRelevantTerms(searchInput.extractedTerm).length === 0) {
     return true;
   }
 
@@ -139,7 +143,8 @@ function scoreProductMatch(searchInput: ProductSearchInput, product: Produto): P
   const normalizedCategory = normalizeFreeText(product.categoria ?? "");
   const normalizedDescription = normalizeFreeText(product.descricao ?? "");
   const exactPhrase = searchInput.normalizedExactPhrase;
-  const exactPhraseTokens = tokenizeRelevantTerms(searchInput.extractedTerm);
+  const originalExactPhraseTokens = tokenizeRelevantTerms(searchInput.extractedTerm);
+  const exactPhraseTokens = expandTokenEquivalents(originalExactPhraseTokens);
   const matchedTokensInName = countMatchedTokens(product.nome, exactPhraseTokens);
   const matchedTokensInCategory = countMatchedTokens(product.categoria ?? "", exactPhraseTokens);
   const matchedTokensInDescription = countMatchedTokens(product.descricao ?? "", exactPhraseTokens);
@@ -168,13 +173,15 @@ function scoreProductMatch(searchInput: ProductSearchInput, product: Produto): P
     score += Math.min(matchedTokensInDescription * 2, 6);
   }
 
-  if (!matchedExactPhrase && exactPhraseTokens.length >= 2 && !matchedAllTokensInName) {
+  if (matchedExactPhrase || (exactPhraseTokens.length === 1 && matchedTokensInName > 0)) {
+    discardedReason = undefined;
+  } else if (!matchedExactPhrase && originalExactPhraseTokens.length >= 2 && !matchedAllTokensInName) {
     discardedReason = "missing_required_tokens_in_name";
     score = 0;
   } else if (!matchedExactPhrase && matchedTokensInName === 0 && matchedTokensInCategory === 0) {
     discardedReason = "no_name_or_category_match";
     score = 0;
-  } else if (matchedTokensInName === 1 && exactPhraseTokens.length >= 2 && matchedTokensInCategory === 0) {
+  } else if (matchedTokensInName === 1 && originalExactPhraseTokens.length >= 2 && matchedTokensInCategory === 0) {
     discardedReason = "single_token_weak_match";
     score = 0;
   } else if (!matchedExactPhrase && matchedTokensInDescription > 0 && matchedTokensInName === 0) {

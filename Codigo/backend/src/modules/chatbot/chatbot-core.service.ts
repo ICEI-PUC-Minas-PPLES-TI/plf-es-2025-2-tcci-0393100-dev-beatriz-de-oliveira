@@ -463,6 +463,16 @@ export class ChatbotCoreService {
       },
       "[ChatbotProduct]",
     );
+    console.info("[ProductSearch] termo_original", context.message.originalText);
+    console.info("[ProductSearch] termo_normalizado", productSearch.extractedTerm);
+    console.info("[ProductSearch] categoria_contexto", context.state.selectedCategoryName ?? null);
+    console.info("[ProductSearch] resultados_categoria", []);
+    console.info("[ProductSearch] resultados_global", productSearch.products.map((product) => product.nome));
+    console.info("[ProductSearch] produtos_descartados", productSearch.discardedProducts.map((product) => ({
+      produto: product.productName,
+      motivo_descarte: product.discardedReason ?? "score_insuficiente",
+    })));
+    console.info("[ProductSearch] resultado_final", productSearch.products.map((product) => product.nome));
 
     if (productSearch.products.length === 0) {
       return null;

@@ -85,6 +85,11 @@ export class ProductsHandler implements IntentHandler {
     const categories = listAvailableCategories(available);
     const categoryMatch = extractCategoryFromMessage(context.message.originalText, categories);
     const isCategorySelection = /^(?:categoria|cat)\s+/i.test(context.message.originalText.trim());
+    const categoryFromState =
+      context.state.stage === "AGUARDANDO_CATEGORIA" && !isCategorySelection
+        ? context.state.selectedCategoryName
+        : undefined;
+    const matchedCategory = categoryMatch.matchedCategory ?? categoryFromState;
 
     if (available.length === 0) {
       return {
@@ -161,7 +166,7 @@ export class ProductsHandler implements IntentHandler {
       }
     }
 
-    if (!categoryMatch.matchedCategory && context.state.stage !== "AGUARDANDO_CATEGORIA" && !isCategorySelection) {
+    if (!matchedCategory && context.state.stage !== "AGUARDANDO_CATEGORIA" && !isCategorySelection) {
       return {
         intent: this.intent,
         handler: "ProductsHandler",
@@ -186,12 +191,13 @@ export class ProductsHandler implements IntentHandler {
     console.info("[ProductsHandler] categoria_resolvida", {
       receivedCategory: categoryMatch.receivedCategory,
       normalizedCategory: categoryMatch.normalizedCategory,
-      foundCategory: categoryMatch.matchedCategory ?? null,
+      foundCategory: matchedCategory ?? null,
+      categoryFromState: categoryFromState ?? null,
       stateStage: context.state.stage,
       isCategorySelection,
     });
 
-    if (!categoryMatch.matchedCategory) {
+    if (!matchedCategory) {
       return {
         intent: this.intent,
         handler: "ProductsHandler",
@@ -213,9 +219,13 @@ export class ProductsHandler implements IntentHandler {
       };
     }
 
-    const refinement = extractCategoryRefinement(context.message.originalText);
+    const refinement =
+      categoryFromState && !categoryMatch.matchedCategory
+        ? { term: context.message.originalText.trim(), general: false }
+        : extractCategoryRefinement(context.message.originalText);
+
     if (isCategorySelection && !refinement.term && !refinement.general) {
-      const replyText = `Dentro de ${categoryMatch.matchedCategory}, digite o nome do produto que voce procura ou veja opcoes gerais.`;
+      const replyText = `Dentro de ${matchedCategory}, digite o nome do produto que voce procura ou veja opcoes gerais.`;
       return {
         intent: this.intent,
         handler: "ProductsHandlerCategoryPrompt",
@@ -224,41 +234,60 @@ export class ProductsHandler implements IntentHandler {
         actions: ["ask_product_name_in_category"],
         handoffRequested: false,
         telegram: {
-          inlineKeyboard: buildCategoryBrowseKeyboard(categoryMatch.matchedCategory),
+          inlineKeyboard: buildCategoryBrowseKeyboard(matchedCategory),
         },
         stateTransition: {
           stage: "AGUARDANDO_CATEGORIA",
           awaitingProductSelectionForInterest: false,
           lastShownProducts: [],
           lastSuggestedCategories: categories,
-          selectedCategoryName: categoryMatch.matchedCategory,
+          selectedCategoryName: matchedCategory,
           selectedProductName: undefined,
         },
       };
     }
 
     const categoryProducts = available.filter(
-      (product) => normalizeMessageText(product.categoria) === normalizeMessageText(categoryMatch.matchedCategory as string),
+      (product) => normalizeMessageText(product.categoria) === normalizeMessageText(matchedCategory),
     );
     const filteredProducts = refinement.term
       ? categoryProducts.filter((product) => productMatchesTerm(product, refinement.term as string))
       : categoryProducts;
+    const globalFallbackProducts = refinement.term
+      ? available.filter((product) => productMatchesTerm(product, refinement.term as string))
+      : [];
+    const finalProducts = filteredProducts.length > 0 ? filteredProducts : globalFallbackProducts;
+    const usedGlobalFallback = filteredProducts.length === 0 && globalFallbackProducts.length > 0;
+
+    console.info("[ProductSearch] termo_original", context.message.originalText);
+    console.info("[ProductSearch] termo_normalizado", normalizeMessageText(refinement.term ?? context.message.originalText));
+    console.info("[ProductSearch] categoria_contexto", matchedCategory);
+    console.info("[ProductSearch] resultados_categoria", filteredProducts.map((product) => product.nome));
+    console.info("[ProductSearch] resultados_global", globalFallbackProducts.map((product) => product.nome));
+    console.info("[ProductSearch] produtos_descartados", categoryProducts
+      .filter((product) => refinement.term && !productMatchesTerm(product, refinement.term))
+      .slice(0, 10)
+      .map((product) => ({ produto: product.nome, motivo_descarte: "termo_nao_encontrado" })));
+    console.info("[ProductSearch] resultado_final", {
+      fallback_global: usedGlobalFallback,
+      produtos: finalProducts.slice(0, 5).map((product) => product.nome),
+    });
 
     console.info("[ProductsHandler] produtos_encontrados", {
       receivedCategory: categoryMatch.receivedCategory,
       normalizedCategory: categoryMatch.normalizedCategory,
-      foundCategory: categoryMatch.matchedCategory,
+      foundCategory: matchedCategory,
       refinement: refinement.term ?? null,
-      productCount: filteredProducts.length,
-      products: filteredProducts.slice(0, 5).map((product) => product.nome),
+      productCount: finalProducts.length,
+      products: finalProducts.slice(0, 5).map((product) => product.nome),
     });
 
-    if (filteredProducts.length === 0) {
+    if (finalProducts.length === 0) {
       return {
         intent: this.intent,
         handler: "ProductsHandler",
-        replyText: `Nao encontrei uma opcao boa para ${refinement.term ?? categoryMatch.matchedCategory}.\nPosso te conectar com um vendedor.`,
-        replyMessages: [`Nao encontrei uma opcao boa para ${refinement.term ?? categoryMatch.matchedCategory}.\nPosso te conectar com um vendedor.`],
+        replyText: `Nao encontrei uma opcao boa para ${refinement.term ?? matchedCategory}.\nPosso te conectar com um vendedor.`,
+        replyMessages: [`Nao encontrei uma opcao boa para ${refinement.term ?? matchedCategory}.\nPosso te conectar com um vendedor.`],
         actions: ["category_without_products"],
         handoffRequested: false,
         telegram: {
@@ -269,17 +298,17 @@ export class ProductsHandler implements IntentHandler {
           awaitingProductSelectionForInterest: false,
           lastShownProducts: [],
           lastSuggestedCategories: categories,
-          selectedCategoryName: categoryMatch.matchedCategory,
+          selectedCategoryName: matchedCategory,
           selectedProductName: undefined,
         },
       };
     }
 
     const offset = extractCategoryOffset(context.message.originalText);
-    const displayedProducts = filteredProducts.slice(offset, offset + 3);
+    const displayedProducts = finalProducts.slice(offset, offset + 3);
     const selectedProductName = displayedProducts.length === 1 ? displayedProducts[0]!.nome : undefined;
-    const hasMoreProducts = offset + displayedProducts.length < filteredProducts.length;
-    const replyText = `Encontrei boas opcoes em ${categoryMatch.matchedCategory}\n\n${buildProductListLines(displayedProducts)}`;
+    const hasMoreProducts = offset + displayedProducts.length < finalProducts.length;
+    const replyText = `${usedGlobalFallback ? "Nao achei dentro da categoria, mas encontrei no catalogo" : `Encontrei boas opcoes em ${matchedCategory}`}\n\n${buildProductListLines(displayedProducts)}`;
 
     return {
       intent: this.intent,
@@ -290,7 +319,7 @@ export class ProductsHandler implements IntentHandler {
       handoffRequested: false,
       telegram: {
         inlineKeyboard: buildProductListKeyboard(displayedProducts.map((item) => item.nome), {
-          categoryName: categoryMatch.matchedCategory,
+          categoryName: matchedCategory,
           nextOffset: hasMoreProducts ? offset + displayedProducts.length : undefined,
         }),
         keyboardPrompt: "Escolha uma acao para continuar.",
@@ -301,7 +330,7 @@ export class ProductsHandler implements IntentHandler {
         awaitingProductSelectionForInterest: false,
         lastShownProducts: displayedProducts.map((item) => item.nome),
         lastSuggestedCategories: categories,
-        selectedCategoryName: categoryMatch.matchedCategory,
+        selectedCategoryName: matchedCategory,
         selectedProductName,
       },
     };
