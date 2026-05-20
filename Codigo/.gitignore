@@ -1,6 +1,9 @@
 node_modules/
 dist/
 build/
+coverage/
+test-results/
+playwright-report/
 .cache/
 
 .env
@@ -8,6 +11,8 @@ build/
 !.env.example
 
 *.log
+*.tmp
+*.bak
 
 .vscode/
 .idea/

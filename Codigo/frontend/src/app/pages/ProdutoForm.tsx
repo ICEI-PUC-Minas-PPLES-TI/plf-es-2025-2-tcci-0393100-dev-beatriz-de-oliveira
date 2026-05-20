@@ -24,6 +24,7 @@ import { Switch } from "../components/ui/switch";
 import { Textarea } from "../components/ui/textarea";
 import { ImageWithFallback } from "../components/ImageWithFallback";
 import type { ProductImage } from "../types/domain";
+import { normalizeProductImages } from "../utils/productImages";
 
 interface ProdutoFormData {
   nome: string;
@@ -69,29 +70,6 @@ async function optimizeImage(file: File): Promise<string> {
 
   context.drawImage(image, 0, 0, width, height);
   return canvas.toDataURL("image/jpeg", 0.82);
-}
-
-function normalizeImages(images: ProductImage[]): ProductImage[] {
-  const cleaned = images
-    .map((image) => image.imageUrl.trim())
-    .filter(Boolean)
-    .filter((imageUrl, index, all) => all.indexOf(imageUrl) === index)
-    .map((imageUrl, index) => ({
-      imageUrl,
-      ordem: index,
-      principal: false,
-    }));
-
-  if (cleaned.length > 0) {
-    const preferred = images.find((image) => image.principal && image.imageUrl.trim());
-    const preferredIndex = preferred ? cleaned.findIndex((image) => image.imageUrl === preferred.imageUrl.trim()) : -1;
-    cleaned[preferredIndex >= 0 ? preferredIndex : 0] = {
-      ...cleaned[preferredIndex >= 0 ? preferredIndex : 0]!,
-      principal: true,
-    };
-  }
-
-  return cleaned;
 }
 
 function isHttpUrl(value: string): boolean {
@@ -160,7 +138,7 @@ export function ProdutoForm() {
         preco: produtoAtual.preco,
         quantidade: String(produtoAtual.quantidade ?? 0),
         disponibilidade: produtoAtual.disponivel,
-        images: normalizeImages(productImages),
+        images: normalizeProductImages(productImages),
       });
     }
   }, [isEdit, produtoAtual]);
@@ -179,7 +157,7 @@ export function ProdutoForm() {
   const updateImages = (updater: (images: ProductImage[]) => ProductImage[]) => {
     setFormData((current) => ({
       ...current,
-      images: normalizeImages(updater(current.images)),
+      images: normalizeProductImages(updater(current.images)),
     }));
   };
 
@@ -239,7 +217,7 @@ export function ProdutoForm() {
     event.preventDefault();
     setIsSubmitting(true);
 
-    const images = normalizeImages(formData.images);
+    const images = normalizeProductImages(formData.images);
     const primaryImage = images.find((image) => image.principal)?.imageUrl ?? images[0]?.imageUrl ?? "";
     if (!primaryImage) {
       toast.error("Adicione pelo menos uma imagem valida para o produto.");

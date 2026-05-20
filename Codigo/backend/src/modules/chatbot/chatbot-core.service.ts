@@ -26,7 +26,7 @@ import type {
   ChatbotProcessResult,
   ChatbotProcessedMessage,
   ChatbotResponse,
-  WhatsAppIncomingMessage,
+  IncomingChatbotMessage,
 } from "./types.js";
 
 interface LoggerLike {
@@ -87,73 +87,6 @@ function getTextContent(message: Record<string, unknown>): string | null {
   }
 
   return null;
-}
-
-function extractIncomingMessages(payload: Record<string, unknown>): WhatsAppIncomingMessage[] {
-  const entries = asArray(payload.entry);
-  const result: WhatsAppIncomingMessage[] = [];
-
-  for (const entry of entries) {
-    const entryRecord = asRecord(entry);
-    if (!entryRecord) {
-      continue;
-    }
-
-    const changes = asArray(entryRecord.changes);
-    for (const change of changes) {
-      const changeRecord = asRecord(change);
-      const valueRecord = asRecord(changeRecord?.value);
-      if (!valueRecord) {
-        continue;
-      }
-
-      const contacts = asArray(valueRecord.contacts);
-      const profileNameByPhone = new Map<string, string>();
-      for (const contact of contacts) {
-        const contactRecord = asRecord(contact);
-        if (!contactRecord || typeof contactRecord.wa_id !== "string") {
-          continue;
-        }
-        const profile = asRecord(contactRecord.profile);
-        if (profile && typeof profile.name === "string") {
-          profileNameByPhone.set(contactRecord.wa_id, profile.name);
-        }
-      }
-
-      const messages = asArray(valueRecord.messages);
-      for (const message of messages) {
-        const messageRecord = asRecord(message);
-        if (!messageRecord || typeof messageRecord.from !== "string") {
-          continue;
-        }
-
-        const text = getTextContent(messageRecord);
-        if (!text || !text.trim()) {
-          continue;
-        }
-
-        const messageId =
-          typeof messageRecord.id === "string" && messageRecord.id.trim().length > 0
-            ? messageRecord.id
-            : `${messageRecord.from}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-        const hasStableMessageId = typeof messageRecord.id === "string" && messageRecord.id.trim().length > 0;
-        const timestamp = typeof messageRecord.timestamp === "string" ? messageRecord.timestamp : undefined;
-        const profileName = profileNameByPhone.get(messageRecord.from);
-
-        result.push({
-          from: messageRecord.from,
-          messageId,
-          hasStableMessageId,
-          timestamp,
-          text,
-          profileName,
-          raw: messageRecord,
-        });
-      }
-    }
-  }
-
-  return result;
 }
 
 function buildInterestSummary(messageText: string): string {
@@ -495,7 +428,7 @@ export class ChatbotCoreService {
   }
 
   private async processSingleMessage(
-    message: WhatsAppIncomingMessage,
+    message: IncomingChatbotMessage,
     payload: Record<string, unknown>,
   ): Promise<ProcessedMessageResult> {
     this.logger.info(
@@ -681,7 +614,7 @@ export class ChatbotCoreService {
     }
   }
 
-  async processIncomingMessages(messages: WhatsAppIncomingMessage[], payload: Record<string, unknown>): Promise<ChatbotProcessResult> {
+  async processIncomingMessages(messages: IncomingChatbotMessage[], payload: Record<string, unknown>): Promise<ChatbotProcessResult> {
     if (messages.length === 0) {
       return {
         consumed: false,
@@ -732,20 +665,4 @@ export class ChatbotCoreService {
     };
   }
 
-  async processEvent(payload: Record<string, unknown>): Promise<ChatbotProcessResult> {
-    const messages = extractIncomingMessages(payload);
-
-    if (messages.length === 0) {
-      this.logger.info({ event: "ignored_event", reason: "no_supported_messages" }, "[ChatbotCore]");
-      return {
-        consumed: false,
-        extractedMessages: 0,
-        responses: [],
-        messageResults: [],
-        reason: "no_supported_messages",
-      };
-    }
-
-    return this.processIncomingMessages(messages, payload);
-  }
 }

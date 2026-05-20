@@ -18,7 +18,7 @@ export type ConversationStage =
   | "AGUARDANDO_NOME_CLIENTE"
   | "ENCAMINHADO_HUMANO";
 
-export interface WhatsAppIncomingMessage {
+export interface IncomingChatbotMessage {
   from: string;
   channel?: "telegram";
   messageId: string;

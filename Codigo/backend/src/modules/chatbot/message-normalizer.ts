@@ -1,4 +1,4 @@
-﻿import type { NormalizedIncomingMessage, WhatsAppIncomingMessage } from "./types.js";
+import type { IncomingChatbotMessage, NormalizedIncomingMessage } from "./types.js";
 
 function collapseSpaces(value: string): string {
   return value.replace(/\s+/g, " ").trim();
@@ -12,7 +12,7 @@ export function normalizeMessageText(text: string): string {
   return removeAccents(collapseSpaces(text)).toLowerCase();
 }
 
-export function normalizeIncomingMessage(message: WhatsAppIncomingMessage): NormalizedIncomingMessage {
+export function normalizeIncomingMessage(message: IncomingChatbotMessage): NormalizedIncomingMessage {
   return {
     from: message.from,
     channel: message.channel,

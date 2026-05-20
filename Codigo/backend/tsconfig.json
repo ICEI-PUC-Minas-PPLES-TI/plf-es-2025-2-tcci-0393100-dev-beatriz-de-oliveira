@@ -16,16 +16,7 @@
   },
   "include": ["src"],
   "exclude": [
-    "src/controllers-orig",
     "src/scripts",
-    "src/jobs",
-    "src/repositories/in-memory.repositories.ts",
-    "src/controllers/whatsapp.controller.ts",
-    "src/modules/whatsapp",
-    "src/schemas/whatsapp.schema.ts",
-    "src/services/whatsapp.service.ts",
-    "src/services/whatsapp",
-    "src/repositories/whatsapp.repository.ts",
-    "src/repositories/postgres/whatsapp.repository.ts"
+    "src/jobs"
   ]
 }

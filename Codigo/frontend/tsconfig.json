@@ -27,6 +27,5 @@
     }
   },
   "include": ["src"],
-  "exclude": ["src/app/pages/WhatsApp.tsx", "src/app/route-modules/whatsapp.route.tsx"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

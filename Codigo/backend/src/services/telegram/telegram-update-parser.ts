@@ -1,4 +1,4 @@
-import type { WhatsAppIncomingMessage } from "../../modules/chatbot/types.js";
+import type { IncomingChatbotMessage } from "../../modules/chatbot/types.js";
 
 export type TelegramWebhookPayload = {
   update_id?: number;
@@ -39,7 +39,7 @@ export type TelegramWebhookPayload = {
 };
 
 export type TelegramParseResult =
-  | { kind: "message"; message: WhatsAppIncomingMessage; callbackQueryId?: string }
+  | { kind: "message"; message: IncomingChatbotMessage; callbackQueryId?: string }
   | { kind: "ignored"; reason: string }
   | { kind: "invalid"; reason: string };
 
