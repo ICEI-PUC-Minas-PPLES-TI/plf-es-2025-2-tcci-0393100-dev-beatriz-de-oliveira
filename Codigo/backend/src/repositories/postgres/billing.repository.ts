@@ -421,6 +421,11 @@ export class PostgresBillingRepository implements BillingRepository {
 
   private async createSupportTables(): Promise<void> {
     await pool.query(`
+      ALTER TABLE regras_cobranca
+      ALTER COLUMN valor TYPE text
+    `);
+
+    await pool.query(`
       ALTER TABLE pedidos
       ADD COLUMN IF NOT EXISTS pago_em timestamp without time zone
     `);

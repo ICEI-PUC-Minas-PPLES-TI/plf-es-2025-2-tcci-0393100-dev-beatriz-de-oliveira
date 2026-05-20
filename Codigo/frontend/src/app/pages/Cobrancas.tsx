@@ -85,6 +85,7 @@ const getTemplateForChargeKind = (rule: BillingRule, kind: BillingChargeKind) =>
 const renderChargeMessage = (template: string, pedido: Pedido) =>
   template
     .replace(/\{nome\}/g, pedido.cliente)
+    .replace(/\{produto\}/g, pedido.produto_nome ?? pedido.numero_pedido)
     .replace(/\{valor\}/g, pedido.valor_total)
     .replace(/\{data\}/g, formatIsoDateToPtBr(pedido.data_vencimento));
 
@@ -120,6 +121,7 @@ const buildPreviewForKind = (rule: BillingRule, kind: BillingChargeKind) => {
   const sampleOrder: Pedido = {
     id: 0,
     numero_pedido: "PED-0000",
+    produto_nome: "Smart TV 55 Polegadas",
     cliente: "Maria Silva",
     telefone_cliente: "(11) 99999-0000",
     valor_total: "R$ 249,90",
@@ -190,10 +192,10 @@ function BillingConfigSection(props: {
             value={templateValue}
             onChange={(event) => onTemplateChange(event.target.value)}
             rows={4}
-            placeholder="Use {nome}, {valor}, {data} como variáveis"
+            placeholder="Use {nome}, {produto}, {valor}, {data} como variáveis"
             disabled={loading}
           />
-          <p className="text-xs text-muted-foreground">Variáveis disponíveis: {"{nome}, {valor}, {data}"}</p>
+          <p className="text-xs text-muted-foreground">Variáveis disponíveis: {"{nome}, {produto}, {valor}, {data}"}</p>
         </div>
 
         <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-4">

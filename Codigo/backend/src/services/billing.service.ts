@@ -255,6 +255,7 @@ export class BillingService {
   private buildMessage(order: Pedido, rule: BillingRule, kind: BillingChargeKind): string {
     return this.getTemplateForKind(rule, kind)
       .replace(/\{nome\}/g, order.cliente)
+      .replace(/\{produto\}/g, order.produto_nome ?? order.numero_pedido)
       .replace(/\{valor\}/g, order.valor_total)
       .replace(/\{data\}/g, this.formatDateToPtBr(order.data_vencimento));
   }

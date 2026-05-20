@@ -34,7 +34,7 @@ create table if not exists public.regras_cobranca (
   regra_id uuid primary key default gen_random_uuid(),
   nome varchar(100) not null,
   tipo varchar(50) not null,
-  valor varchar(100) not null,
+  valor text not null,
   ativo boolean not null default true,
   criado_em timestamp not null default now(),
   atualizado_em timestamp not null default now()

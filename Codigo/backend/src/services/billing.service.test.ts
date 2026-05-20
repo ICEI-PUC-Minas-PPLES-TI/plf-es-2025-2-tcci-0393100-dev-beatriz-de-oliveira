@@ -7,7 +7,7 @@ describe("BillingService", () => {
     const telegram = { sendManualMessage: vi.fn().mockResolvedValue({ id: 1 }) };
     const repository = {
       findOrderById: vi.fn().mockResolvedValue(order()),
-      getRule: vi.fn().mockResolvedValue(billingRule()),
+      getRule: vi.fn().mockResolvedValue(billingRule({ template_apos_vencimento: "Oi {nome}, seu pedido {produto} de {valor} esta em atraso desde {data}." })),
       sendManualCharge: vi.fn().mockResolvedValue(order({ cobrancaStatus: "ENVIADO" })),
     };
 
@@ -15,6 +15,7 @@ describe("BillingService", () => {
 
     expect(telegram.sendManualMessage).toHaveBeenCalledWith(expect.objectContaining({ chatId: "1439821696" }));
     expect(repository.sendManualCharge).toHaveBeenCalledWith(1, expect.stringContaining("Beatriz"));
+    expect(repository.sendManualCharge).toHaveBeenCalledWith(1, expect.stringContaining("TV 50 SMART MULTILASER"));
     expect(result.cobrancaStatus).toBe("ENVIADO");
   });
 
