@@ -1,5 +1,6 @@
 import { env } from "../config/env.js";
 import type { ChatbotCoreService } from "../modules/chatbot/chatbot-core.service.js";
+import { assertTelegramCallbackDataWithinLimit } from "../modules/chatbot/telegram-callback-data.js";
 import type { TelegramRepository } from "../repositories/telegram.repository.js";
 import type { ChatbotProcessResult, ChatbotResponse } from "../modules/chatbot/types.js";
 import type { Mensagem, Produto } from "../types/domain.js";
@@ -820,10 +821,16 @@ export class TelegramService {
 
     return {
       inline_keyboard: inlineKeyboard.map((row) =>
-        row.map((button) => ({
-          text: button.text,
-          callback_data: button.callbackData,
-        })),
+        row.map((button) => {
+          assertTelegramCallbackDataWithinLimit(button.callbackData, {
+            buttonText: button.text,
+          });
+
+          return {
+            text: button.text,
+            callback_data: button.callbackData,
+          };
+        }),
       ),
     };
   }

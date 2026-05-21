@@ -120,6 +120,9 @@ export function detectIntent(normalizedText: string, state: ChatbotConversationS
     if (/^categoria\s+.+\s+pagina\s+\d+$/i.test(normalizedText)) return "products";
     if (/^categoria\s+.+\s+geral$/i.test(normalizedText)) return "products";
 
+    if (hasAnyKeyword(normalizedText, HUMAN_HANDOFF_KEYWORDS)) return "human_handoff";
+    if (hasAnyKeyword(normalizedText, LEAD_INTEREST_KEYWORDS)) return "lead_interest";
+
     const choiceIndex = parseProductChoice(normalizedText, state.lastShownProducts.length);
     if (choiceIndex !== null) return state.awaitingProductSelectionForInterest ? "lead_interest" : "products";
 

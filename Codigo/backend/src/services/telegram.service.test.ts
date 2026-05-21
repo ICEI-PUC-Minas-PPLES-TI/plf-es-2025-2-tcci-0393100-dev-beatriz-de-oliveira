@@ -63,6 +63,26 @@ describe("TelegramService", () => {
     }));
   });
 
+  it("registra FALHA e nao ENVIADA quando Telegram recusa envio", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: false,
+      json: async () => ({ description: "Bad Request: BUTTON_DATA_INVALID" }),
+    }));
+    const response = { intent: "menu", handler: "test", replyText: "ok", actions: [], handoffRequested: false } as ChatbotResponse;
+    const { telegram, repository } = service(response);
+
+    await expect(telegram.sendManualMessage({ atendimentoId: 7, texto: "Oi, sou atendente" })).rejects.toThrow(
+      "BUTTON_DATA_INVALID",
+    );
+
+    expect(repository.saveOutgoingMessage).toHaveBeenCalledWith(expect.objectContaining({
+      statusEntrega: "FALHA",
+    }));
+    expect(repository.saveOutgoingMessage).not.toHaveBeenCalledWith(expect.objectContaining({
+      statusEntrega: "ENVIADA",
+    }));
+  });
+
   it("na listagem de produtos envia apenas texto, sem foto", async () => {
     const response = {
       intent: "products",

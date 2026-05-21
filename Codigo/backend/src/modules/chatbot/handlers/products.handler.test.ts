@@ -59,6 +59,30 @@ describe("ProductsHandler", () => {
     expect(response.telegram?.inlineKeyboard?.flat().map((button) => button.text)).toContain("Falar com vendedor");
   });
 
+  it("resolve callback curto pelo indice do produto exibido", async () => {
+    const firstProduct = "Bicicleta ergometrica profissional reforcada com monitor digital multifuncional";
+    const secondProduct = "Esteira eletrica dobravel com painel digital e programas automaticos";
+    const handler = new ProductsHandler({
+      list: async () => [
+        product({ id: 1, nome: firstProduct, categoria: "Esporte e Lazer" }),
+        product({ id: 2, nome: secondProduct, categoria: "Esporte e Lazer" }),
+      ],
+    } as never);
+
+    const response = await handler.handle(chatbotContext("ver mais 2", {
+      state: state({
+        stage: "AGUARDANDO_ESCOLHA_PRODUTO",
+        selectedCategoryName: "Esporte e Lazer",
+        lastShownProducts: [firstProduct, secondProduct],
+      }),
+    }));
+
+    expect(response.actions).toContain("product_details");
+    expect(response.replyText).toContain(secondProduct);
+    expect(response.replyText).not.toContain(firstProduct);
+    expect(response.stateTransition?.lastShownProducts).toEqual([secondProduct]);
+  });
+
   it("pagina produtos quando cliente clica em Ver mais", async () => {
     const handler = new ProductsHandler({
       list: async () => [

@@ -1,6 +1,7 @@
 import type { ProductsService } from "../../../services/products.service.js";
 import type { Produto } from "../../../types/domain.js";
-import { extractCategoryFromMessage, listAvailableCategories } from "../category-resolver.js";
+import { extractCategoryFromMessage, listAvailableCategories, resolveCategoryName } from "../category-resolver.js";
+import { parseProductChoice } from "../intent-detector.js";
 import { normalizeMessageText } from "../message-normalizer.js";
 import type { ChatbotContext, ChatbotResponse, IntentHandler } from "../types.js";
 import {
@@ -48,6 +49,16 @@ function extractCategoryOffset(messageText: string): number {
   return Number.isFinite(offset) && offset > 0 ? offset : 0;
 }
 
+function resolveCategoryFromIndexSelection(messageText: string, categories: string[]): string | undefined {
+  const match = messageText.trim().match(/^categoria\s+item\s+(\d+)$/i);
+  const categoryIndex = match?.[1] ? Number.parseInt(match[1], 10) - 1 : -1;
+  if (!Number.isInteger(categoryIndex) || categoryIndex < 0) {
+    return undefined;
+  }
+
+  return categories[categoryIndex];
+}
+
 function extractCategoryRefinement(messageText: string): { term?: string; general: boolean } {
   const trimmed = messageText.trim();
   const refineMatch = trimmed.match(/\s+busca\s+(.+)$/i);
@@ -74,6 +85,19 @@ function productMatchesTerm(product: Produto, term: string): boolean {
   });
 }
 
+function resolveSelectedProductName(context: ChatbotContext): string | undefined {
+  if (context.selectedProductName) {
+    return context.selectedProductName;
+  }
+
+  const choiceIndex = parseProductChoice(context.message.normalizedText, context.state.lastShownProducts.length);
+  if (choiceIndex === null) {
+    return undefined;
+  }
+
+  return context.state.lastShownProducts[choiceIndex];
+}
+
 export class ProductsHandler implements IntentHandler {
   intent = "products" as const;
 
@@ -83,13 +107,20 @@ export class ProductsHandler implements IntentHandler {
     const products = await this.productsService.list();
     const available = products.filter((product) => product.disponivel);
     const categories = listAvailableCategories(available);
-    const categoryMatch = extractCategoryFromMessage(context.message.originalText, categories);
+    const categoryFromIndexSelection = resolveCategoryFromIndexSelection(
+      context.message.originalText,
+      context.state.lastSuggestedCategories,
+    );
+    const categoryMatch = categoryFromIndexSelection
+      ? resolveCategoryName(categoryFromIndexSelection, categories)
+      : extractCategoryFromMessage(context.message.originalText, categories);
     const isCategorySelection = /^(?:categoria|cat)\s+/i.test(context.message.originalText.trim());
     const categoryFromState =
       context.state.stage === "AGUARDANDO_CATEGORIA" && !isCategorySelection
         ? context.state.selectedCategoryName
         : undefined;
     const matchedCategory = categoryMatch.matchedCategory ?? categoryFromState;
+    const selectedProductNameFromContext = resolveSelectedProductName(context);
 
     if (available.length === 0) {
       return {
@@ -111,8 +142,8 @@ export class ProductsHandler implements IntentHandler {
       };
     }
 
-    if (context.state.stage === "AGUARDANDO_ESCOLHA_PRODUTO" && context.selectedProductName) {
-      const selectedProduct = available.find((product) => product.nome === context.selectedProductName);
+    if (context.state.stage === "AGUARDANDO_ESCOLHA_PRODUTO" && selectedProductNameFromContext) {
+      const selectedProduct = available.find((product) => product.nome === selectedProductNameFromContext);
       if (selectedProduct && wantsMoreProductPhotos(context.message.normalizedText)) {
         const replyText = `Separei mais fotos de ${selectedProduct.nome}.`;
         return {

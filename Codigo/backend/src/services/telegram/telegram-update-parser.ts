@@ -65,6 +65,10 @@ function buildProfileName(from?: { first_name?: string; last_name?: string; user
   return from.username?.trim() || undefined;
 }
 
+function readableSlug(value: string): string {
+  return value.replace(/-/g, " ").trim();
+}
+
 function mapCallbackDataToText(data?: string): string | null {
   const trimmed = data?.trim();
   if (!trimmed) {
@@ -87,13 +91,26 @@ function mapCallbackDataToText(data?: string): string | null {
     return `categoria ${value}`;
   }
 
+  if (action === "category_idx" && value) {
+    return `categoria item ${value}`;
+  }
+
   if (action === "category_refine" && value) {
     const [categoryName, term] = value.split(":");
     return `categoria ${categoryName?.trim() ?? ""} busca ${term?.trim() ?? ""}`.trim();
   }
 
+  if (action === "cat_refine" && value) {
+    const [categorySlug, termSlug] = value.split(":");
+    return `categoria ${readableSlug(categorySlug ?? "")} busca ${readableSlug(termSlug ?? "")}`.trim();
+  }
+
   if (action === "category_general" && value) {
     return `categoria ${value} geral`;
+  }
+
+  if (action === "cat_general" && value) {
+    return `categoria ${readableSlug(value)} geral`;
   }
 
   if (action === "category_more" && value) {
@@ -101,13 +118,34 @@ function mapCallbackDataToText(data?: string): string | null {
     return `categoria ${categoryName?.trim() ?? ""} pagina ${offset?.trim() ?? ""}`.trim();
   }
 
+  if (action === "cat_more" && value) {
+    const [categorySlug, offset] = value.split(":");
+    return `categoria ${readableSlug(categorySlug ?? "")} pagina ${offset?.trim() ?? ""}`.trim();
+  }
+
   if (action === "search_refine" && value) {
     const [baseTerm, refinement] = value.split(":");
-    return `quero ${baseTerm?.trim() ?? ""} ${refinement?.trim() ?? ""}`.trim();
+    return `quero ${readableSlug(baseTerm?.trim() ?? "")} ${readableSlug(refinement?.trim() ?? "")}`.trim();
   }
 
   if (action === "search_general" && value) {
-    return `quero ${value} opcoes gerais`;
+    return `quero ${readableSlug(value)} opcoes gerais`;
+  }
+
+  if (action === "product_view" && value) {
+    return `ver mais ${value}`;
+  }
+
+  if (action === "product_photos" && value) {
+    return `ver mais fotos ${value}`;
+  }
+
+  if (action === "product_interest" && value) {
+    return `tenho interesse no item ${value}`;
+  }
+
+  if (action === "product_seller" && value) {
+    return `quero falar com vendedor sobre item ${value}`;
   }
 
   if (normalized.startsWith("product:more:")) {
