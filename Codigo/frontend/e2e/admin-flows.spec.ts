@@ -20,7 +20,24 @@ test("fluxos principais do painel Telegram-only", async ({ page }) => {
       return json({ data: { id: 2, tipo: "enviada", conteudo: "Mensagem manual de teste", horario: "2026-05-17T12:00:00.000Z", remetente: "ATENDENTE", conversationId: 1 } });
     }
     if (url.pathname === "/leads") {
-      return json({ data: [{ id: 1, nome: "Beatriz", telefone: "1439821696", email: "", interesse: "Consultou produtos", status: "EM_CONTATO", data_criacao: "2026-05-17T12:00:00.000Z", canal: "telegram", contatoExibicao: "ID Telegram: 1439821696", origem: "TELEGRAM", intencao: "products" }] });
+      return json({ data: [{
+        id: 1,
+        nome: "Beatriz",
+        telefone: "1439821696",
+        email: "",
+        interesse: "Consultou produtos",
+        status: "EM_CONTATO",
+        data_criacao: "2026-05-17T12:00:00.000Z",
+        canal: "telegram",
+        contatoExibicao: "ID Telegram: 1439821696",
+        origem: "TELEGRAM",
+        intencao: "products",
+        timeline: [
+          { id: "1", type: "status", title: "Lead convertido", description: "Venda concluida para este relacionamento comercial.", occurredAt: "2026-05-18T12:00:00.000Z", status: "CONVERTIDO", reason: "sale_completed" },
+          { id: "2", type: "status", title: "Lead reaberto automaticamente", description: "Cliente voltou a interagir apos conversao ou perda.", occurredAt: "2026-05-20T12:00:00.000Z", status: "EM_CONTATO", reason: "automatic_reopen" },
+          { id: "3", type: "produto", title: "Interesse no produto: TV 43 LG SMART", description: "Cliente demonstrou interesse comercial neste item.", occurredAt: "2026-05-20T12:05:00.000Z" },
+        ],
+      }] });
     }
     if (url.pathname === "/billing-rules") {
       return json({ data: { ativa: true, limite_envio_por_dia: "10", hora_envio: "09:00", lembrete_antes_ativo: true, dias_antes_vencimento: "0", template_antes_vencimento: "Oi {nome}", vencimento_hoje_ativo: true, template_vencimento_hoje: "Oi {nome}", apos_vencimento_ativo: true, dias_apos_vencimento: "1", template_apos_vencimento: "Oi {nome}", dias_atraso_max: "30" } });
@@ -42,10 +59,14 @@ test("fluxos principais do painel Telegram-only", async ({ page }) => {
   await page.getByText("Leads").click();
   await expect(page.getByText("Gestão de Leads")).toBeVisible();
   await expect(page.getByText("Telegram").first()).toBeVisible();
+  await page.getByRole("button", { name: /3 eventos/i }).click();
+  await expect(page.getByText("Lead reaberto automaticamente")).toBeVisible();
+  await expect(page.getByText("Interesse no produto: TV 43 LG SMART")).toBeVisible();
+  await page.keyboard.press("Escape");
 
   await page.getByText("Cobranças").click();
   await expect(page.getByText("Gestão de Cobranças")).toBeVisible();
-  await expect(page.getByText("Telegram").first()).toBeVisible();
+  await expect(page.getByText("Configuração de Cobrança Automática")).toBeVisible();
 
   await page.getByText("Produtos").click();
   await expect(page.getByText("Catálogo de Produtos")).toBeVisible();

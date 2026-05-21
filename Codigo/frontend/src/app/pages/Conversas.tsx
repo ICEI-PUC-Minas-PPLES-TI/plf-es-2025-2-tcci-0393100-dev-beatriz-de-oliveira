@@ -646,7 +646,7 @@ export function Conversas() {
                             <SelectItem value={selectedConversation.leadStatus ?? "NOVO"}>
                               Lead: {selectedConversation.leadStatus === "NOVO"
                                 ? "Novo"
-                                : selectedConversation.leadStatus === "ENCAMINHADO_HUMANO"
+                                : selectedConversation.leadStatus === "ENCAMINHADO"
                                   ? "Encaminhado"
                                   : selectedConversation.leadStatus === "EM_CONTATO"
                                     ? "Em contato"

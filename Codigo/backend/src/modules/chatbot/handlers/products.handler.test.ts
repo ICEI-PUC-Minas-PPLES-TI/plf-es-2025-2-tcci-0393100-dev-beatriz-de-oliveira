@@ -58,4 +58,33 @@ describe("ProductsHandler", () => {
     expect(response.stateTransition?.lastShownProducts).toEqual(["TV 43 LG SMART"]);
     expect(response.telegram?.inlineKeyboard?.flat().map((button) => button.text)).toContain("Falar com vendedor");
   });
+
+  it("pagina produtos quando cliente clica em Ver mais", async () => {
+    const handler = new ProductsHandler({
+      list: async () => [
+        product({ id: 1, nome: "PATINETE INFANTIL", categoria: "Brinquedos" }),
+        product({ id: 2, nome: "BICICLETA CICLO BRASIL", categoria: "Brinquedos" }),
+        product({ id: 3, nome: "TRICICLO INFANTIL", categoria: "Brinquedos" }),
+        product({ id: 4, nome: "BONECA LUNA", categoria: "Brinquedos" }),
+        product({ id: 5, nome: "CARRINHO CONTROLE REMOTO", categoria: "Brinquedos" }),
+      ],
+    } as never);
+
+    const response = await handler.handle(chatbotContext("categoria Brinquedos pagina 3", {
+      state: state({
+        stage: "AGUARDANDO_ESCOLHA_PRODUTO",
+        selectedCategoryName: "Brinquedos",
+        lastShownProducts: ["PATINETE INFANTIL", "BICICLETA CICLO BRASIL", "TRICICLO INFANTIL"],
+      }),
+    }));
+
+    expect(response.actions).toContain("list_products_by_category");
+    expect(response.replyText).toContain("1) BONECA LUNA");
+    expect(response.replyText).toContain("2) CARRINHO CONTROLE REMOTO");
+    expect(response.replyText).not.toContain("PATINETE INFANTIL");
+    expect(response.stateTransition?.lastShownProducts).toEqual([
+      "BONECA LUNA",
+      "CARRINHO CONTROLE REMOTO",
+    ]);
+  });
 });

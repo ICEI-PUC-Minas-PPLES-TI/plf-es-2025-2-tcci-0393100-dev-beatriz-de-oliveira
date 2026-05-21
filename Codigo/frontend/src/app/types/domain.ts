@@ -1,4 +1,5 @@
-export type LeadStatus = "NOVO" | "ENCAMINHADO_HUMANO" | "EM_CONTATO" | "CONVERTIDO" | "PERDIDO";
+export type LeadStatus = "NOVO" | "EM_CONTATO" | "ENCAMINHADO" | "CONVERTIDO" | "PERDIDO";
+export type LeadTimelineEventType = "produto" | "promocao" | "conversa" | "status" | "handoff";
 export type PromocaoTipo = "PROMOCAO" | "DESTAQUE";
 export type PedidoStatus = "PAGO" | "ATRASADO" | "PENDENTE" | "CANCELADO";
 export type AtendimentoStatus = "ATIVO" | "PENDENTE" | "ENCERRADO";
@@ -59,6 +60,17 @@ export interface Lead {
   ultima_interacao?: string;
   atendimento_id?: number;
   encaminhado_humano?: boolean;
+  timeline?: LeadTimelineEvent[];
+}
+
+export interface LeadTimelineEvent {
+  id: string;
+  type: LeadTimelineEventType;
+  title: string;
+  description: string;
+  occurredAt: string;
+  status?: LeadStatus;
+  reason?: string;
 }
 
 export interface Pedido {

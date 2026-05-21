@@ -19,6 +19,21 @@ const leadSchema = {
     ultima_interacao: { type: "string", format: "date-time" },
     atendimento_id: { type: "number" },
     encaminhado_humano: { type: "boolean" },
+    timeline: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          type: { type: "string" },
+          title: { type: "string" },
+          description: { type: "string" },
+          occurredAt: { type: "string", format: "date-time" },
+          status: { type: "string" },
+          reason: { type: "string" },
+        },
+      },
+    },
   },
 };
 

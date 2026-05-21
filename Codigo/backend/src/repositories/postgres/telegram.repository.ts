@@ -70,7 +70,7 @@ export class PostgresTelegramRepository implements TelegramRepository {
             conteudo,
             data_envio,
             remetente,
-            whatsapp_message_id,
+            telegram_message_id,
             tipo_mensagem,
             status_entrega,
             direcao

@@ -18,7 +18,7 @@ interface StatusBadgeProps {
 
 const statusConfig: Record<StatusType, { label: string; className: string }> = {
   NOVO: { label: "Novo", className: "bg-blue-500 text-white hover:bg-blue-600" },
-  ENCAMINHADO_HUMANO: { label: "Encaminhado", className: "bg-purple-500 text-white hover:bg-purple-600" },
+  ENCAMINHADO: { label: "Encaminhado", className: "bg-purple-500 text-white hover:bg-purple-600" },
   EM_CONTATO: { label: "Em Contato", className: "bg-yellow-500 text-white hover:bg-yellow-600" },
   CONVERTIDO: { label: "Convertido", className: "bg-green-500 text-white hover:bg-green-600" },
   PERDIDO: { label: "Perdido", className: "bg-gray-500 text-white hover:bg-gray-600" },

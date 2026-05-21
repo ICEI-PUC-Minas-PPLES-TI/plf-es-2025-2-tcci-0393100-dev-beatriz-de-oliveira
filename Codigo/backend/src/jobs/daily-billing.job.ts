@@ -9,14 +9,14 @@ export class DailyBillingJob {
 
   start() {
     if (!env.BILLING_JOB_ENABLED || this.timer) {
-      console.log("[BillingAutoJob] iniciado", {
+      console.info("[BillingAutoJob] iniciado", {
         enabled: env.BILLING_JOB_ENABLED,
         skipped: this.timer ? "already_running" : "disabled",
       });
       return;
     }
 
-    console.log("[BillingAutoJob] iniciado", {
+    console.info("[BillingAutoJob] iniciado", {
       interval_ms: env.BILLING_JOB_INTERVAL_MS,
       effective_interval_ms: this.getEffectiveIntervalMs(),
       timezone: env.BILLING_JOB_TIMEZONE,
@@ -29,43 +29,21 @@ export class DailyBillingJob {
         const zonedNow = this.getZonedDateTime(now);
         const runKey = `${zonedNow.date}:${rule.hora_envio}`;
 
-        console.log("[BillingAutoJob] regra carregada", {
-          ativa: rule.ativa,
-          limite_diario: rule.limite_envio_por_dia,
-        });
-        console.log("[BillingAutoJob] horario_configurado", {
-          hora_envio: rule.hora_envio,
-          timezone: env.BILLING_JOB_TIMEZONE,
-        });
-        console.log("[BillingAutoJob] agora", zonedNow);
-
         if (!rule.ativa) {
-          console.log("[BillingAutoJob] ignorado motivo", {
-            motivo: "regra_inativa",
-          });
           return;
         }
 
         if (zonedNow.time !== rule.hora_envio) {
-          console.log("[BillingAutoJob] ignorado motivo", {
-            motivo: "fora_do_horario",
-            esperado: rule.hora_envio,
-            atual: zonedNow.time,
-          });
           return;
         }
 
         if (this.lastRunKey === runKey) {
-          console.log("[BillingAutoJob] ignorado motivo", {
-            motivo: "horario_ja_executado",
-            runKey,
-          });
           return;
         }
 
         this.lastRunKey = runKey;
         const result = await this.billingService.runDailyRoutine(now);
-        console.log("[BillingAutoJob] finalizado", {
+        console.info("[BillingAutoJob] finalizado", {
           processed: result.processados,
           eligible: result.elegiveis,
           ignored: result.ignorados,

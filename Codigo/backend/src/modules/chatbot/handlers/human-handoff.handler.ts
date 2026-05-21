@@ -12,7 +12,7 @@ export class HumanHandoffHandler implements IntentHandler {
       phone: context.message.from,
       name: context.message.profileName,
       interest: context.selectedProductName ? `Interesse no produto: ${context.selectedProductName}` : undefined,
-      status: "ENCAMINHADO_HUMANO",
+      status: "ENCAMINHADO",
       channel: context.message.channel,
     };
 

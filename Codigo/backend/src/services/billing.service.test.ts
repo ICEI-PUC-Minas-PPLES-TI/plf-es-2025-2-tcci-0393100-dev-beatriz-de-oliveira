@@ -13,7 +13,10 @@ describe("BillingService", () => {
 
     const result = await new BillingService(repository as never, telegram as never).sendManualCharge(1);
 
-    expect(telegram.sendManualMessage).toHaveBeenCalledWith(expect.objectContaining({ chatId: "1439821696" }));
+    expect(telegram.sendManualMessage).toHaveBeenCalledWith(expect.objectContaining({
+      chatId: "1439821696",
+      texto: expect.stringContaining("TV 50 SMART MULTILASER"),
+    }));
     expect(repository.sendManualCharge).toHaveBeenCalledWith(1, expect.stringContaining("Beatriz"));
     expect(repository.sendManualCharge).toHaveBeenCalledWith(1, expect.stringContaining("TV 50 SMART MULTILASER"));
     expect(result.cobrancaStatus).toBe("ENVIADO");

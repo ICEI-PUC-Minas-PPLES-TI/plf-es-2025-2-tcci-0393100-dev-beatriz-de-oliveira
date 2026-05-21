@@ -145,7 +145,7 @@ export const LEADS: Lead[] = [
     telefone: "(11) 95432-1098",
     email: "pedro.oliveira@email.com",
     interesse: "Mesa de Jantar",
-    status: "ENCAMINHADO_HUMANO" as const,
+    status: "ENCAMINHADO" as const,
     data_criacao: "2026-02-03T16:45:00",
   },
   {
@@ -332,5 +332,3 @@ export const DASHBOARD_ATENDIMENTOS_RECENTES: DashboardAtendimentoRecente[] = [
   { id: 2, cliente: "Joao Santos", mensagem: "Qual o prazo de entrega?", hora: "Ha 12 min" },
   { id: 3, cliente: "Ana Costa", mensagem: "Tem desconto para pagamento a vista?", hora: "Ha 25 min" },
 ];
-
-

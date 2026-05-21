@@ -117,6 +117,9 @@ export function detectIntent(normalizedText: string, state: ChatbotConversationS
   }
 
   if (state.stage === "AGUARDANDO_ESCOLHA_PRODUTO") {
+    if (/^categoria\s+.+\s+pagina\s+\d+$/i.test(normalizedText)) return "products";
+    if (/^categoria\s+.+\s+geral$/i.test(normalizedText)) return "products";
+
     const choiceIndex = parseProductChoice(normalizedText, state.lastShownProducts.length);
     if (choiceIndex !== null) return state.awaitingProductSelectionForInterest ? "lead_interest" : "products";
 

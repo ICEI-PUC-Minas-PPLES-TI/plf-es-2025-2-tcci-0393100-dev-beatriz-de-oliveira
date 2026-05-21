@@ -31,6 +31,22 @@ describe("parseTelegramUpdate", () => {
     }
   });
 
+  it("converte callback de Ver mais da categoria em paginacao", () => {
+    const parsed = parseTelegramUpdate({
+      callback_query: {
+        id: "cb2",
+        data: "CATEGORY_MORE:Brinquedos:3",
+        message: { message_id: 99, chat: { id: 123 } },
+      },
+    });
+
+    expect(parsed.kind).toBe("message");
+    if (parsed.kind === "message") {
+      expect(parsed.callbackQueryId).toBe("cb2");
+      expect(parsed.message.text).toBe("categoria Brinquedos pagina 3");
+    }
+  });
+
   it("ignora fotos recebidas", () => {
     expect(parseTelegramUpdate({ message: { message_id: 1, chat: { id: 123 }, photo: [{}] } })).toEqual({
       kind: "ignored",

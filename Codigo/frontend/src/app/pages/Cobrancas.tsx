@@ -63,7 +63,16 @@ const parseInteger = (value: string) => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
-const toDateOnlyIso = (value: Date) => value.toISOString().slice(0, 10);
+const toDateOnlyIso = (value: Date) => {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(value);
+  const byType = new Map(parts.map((part) => [part.type, part.value]));
+  return `${byType.get("year")}-${byType.get("month")}-${byType.get("day")}`;
+};
 
 const dateFromIso = (value: string) => new Date(`${value}T00:00:00.000Z`);
 

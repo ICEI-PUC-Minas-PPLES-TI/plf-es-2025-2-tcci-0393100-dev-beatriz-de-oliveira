@@ -426,6 +426,17 @@ export class PostgresBillingRepository implements BillingRepository {
     `);
 
     await pool.query(`
+      CREATE TABLE IF NOT EXISTS lead_status_history (
+        id serial PRIMARY KEY,
+        lead_id uuid NOT NULL REFERENCES leads(lead_id) ON DELETE CASCADE,
+        old_status varchar(50),
+        new_status varchar(50) NOT NULL,
+        reason varchar(80) NOT NULL,
+        created_at timestamp without time zone NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await pool.query(`
       ALTER TABLE pedidos
       ADD COLUMN IF NOT EXISTS pago_em timestamp without time zone
     `);
@@ -696,6 +707,17 @@ export class PostgresBillingRepository implements BillingRepository {
   }
 
   private async markLeadConvertedForClient(client: PoolClient, clientId: string): Promise<void> {
+    const leads = await client.query<{ lead_id: string; status: string }>(
+      `
+        SELECT DISTINCT l.lead_id::text, l.status
+        FROM leads l
+        JOIN atendimentos a ON a.lead_id = l.lead_id
+        WHERE a.cliente_id = $1::uuid
+          AND l.status IS DISTINCT FROM 'CONVERTIDO'
+      `,
+      [clientId],
+    );
+
     await client.query(
       `
         UPDATE leads l
@@ -707,6 +729,16 @@ export class PostgresBillingRepository implements BillingRepository {
       `,
       [clientId],
     );
+
+    for (const lead of leads.rows) {
+      await client.query(
+        `
+          INSERT INTO lead_status_history (lead_id, old_status, new_status, reason, created_at)
+          VALUES ($1::uuid, $2, 'CONVERTIDO', 'sale_completed', NOW())
+        `,
+        [lead.lead_id, lead.status],
+      );
+    }
   }
 
   private coerceDate(value?: string | null): string | null {

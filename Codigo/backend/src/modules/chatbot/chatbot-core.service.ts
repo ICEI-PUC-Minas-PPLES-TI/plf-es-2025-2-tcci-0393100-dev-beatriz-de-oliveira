@@ -43,7 +43,7 @@ type ProcessedMessageResult =
 function createDefaultLogger(): LoggerLike {
   return {
     info(payload, message) {
-      console.log(message ?? "[ChatbotCore]", payload);
+      console.info(message ?? "[ChatbotCore]", payload);
     },
     warn(payload, message) {
       console.warn(message ?? "[ChatbotCore]", payload);
@@ -283,7 +283,7 @@ export class ChatbotCoreService {
         interest:
           state.pendingInterestSummary ??
           (state.selectedProductName ? `Interesse no produto: ${state.selectedProductName}` : undefined),
-        status: "ENCAMINHADO_HUMANO",
+        status: "ENCAMINHADO",
         channel: context.message.channel,
       });
 

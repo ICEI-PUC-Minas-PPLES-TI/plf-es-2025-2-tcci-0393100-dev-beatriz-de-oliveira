@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import type { DateRange } from "react-day-picker";
-import { Search, Download, ListTree } from "lucide-react";
+import { Search, Download, ListTree, MessageCircle, Package, Percent, Repeat2, UserRoundCheck } from "lucide-react";
 import { toast } from "sonner";
 import { DateRangePicker } from "../components/DateRangePicker";
 import { StatusBadge } from "../components/StatusBadge";
@@ -11,14 +11,37 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { useLeadsData } from "../hooks/useAdminData";
 import { adminDataService } from "../services/adminDataService";
-import type { Lead, LeadStatus } from "../types/domain";
+import type { Lead, LeadStatus, LeadTimelineEvent, LeadTimelineEventType } from "../types/domain";
 import { isInDateRange } from "../utils/dateRange";
 
-function splitInteresses(interesse?: string): string[] {
-  return (interesse ?? "")
-    .split("|")
-    .map((item) => item.trim())
-    .filter(Boolean);
+const LEAD_STATUSES: LeadStatus[] = ["NOVO", "EM_CONTATO", "ENCAMINHADO", "CONVERTIDO", "PERDIDO"];
+
+const eventStyles: Record<LeadTimelineEventType, { label: string; className: string; icon: typeof Package }> = {
+  produto: { label: "Produto", className: "border-blue-200 bg-blue-50 text-blue-700", icon: Package },
+  promocao: { label: "Promoção", className: "border-orange-200 bg-orange-50 text-orange-700", icon: Percent },
+  conversa: { label: "Conversa", className: "border-slate-200 bg-slate-50 text-slate-700", icon: MessageCircle },
+  status: { label: "Status", className: "border-green-200 bg-green-50 text-green-700", icon: Repeat2 },
+  handoff: { label: "Handoff", className: "border-purple-200 bg-purple-50 text-purple-700", icon: UserRoundCheck },
+};
+
+function getTimelineEventStyle(event: LeadTimelineEvent) {
+  if (event.status === "CONVERTIDO") return { label: "Status", className: "border-green-200 bg-green-50 text-green-700", icon: Repeat2 };
+  if (event.status === "PERDIDO") return { label: "Status", className: "border-red-200 bg-red-50 text-red-700", icon: Repeat2 };
+  return eventStyles[event.type];
+}
+
+function normalizeTimeline(lead: Lead | null): LeadTimelineEvent[] {
+  if (!lead) return [];
+  return lead.timeline ?? [];
+}
+
+function groupTimelineByDay(events: LeadTimelineEvent[]) {
+  const groups = new Map<string, LeadTimelineEvent[]>();
+  for (const event of [...events].sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime())) {
+    const dateKey = new Date(event.occurredAt).toISOString().slice(0, 10);
+    groups.set(dateKey, [...(groups.get(dateKey) ?? []), event]);
+  }
+  return [...groups.entries()];
 }
 
 export function Leads() {
@@ -29,9 +52,7 @@ export function Leads() {
   const [statusByLeadId, setStatusByLeadId] = useState<Record<number, LeadStatus>>({});
   const [selectedInterestLead, setSelectedInterestLead] = useState<Lead | null>(null);
 
-  const isLeadStatus = (value: string): value is LeadStatus => {
-    return ["NOVO", "ENCAMINHADO_HUMANO", "EM_CONTATO", "CONVERTIDO", "PERDIDO"].includes(value);
-  };
+  const isLeadStatus = (value: string): value is LeadStatus => LEAD_STATUSES.includes(value as LeadStatus);
 
   const getLeadStatus = (leadId: number, fallbackStatus: LeadStatus): LeadStatus =>
     statusByLeadId[leadId] ?? fallbackStatus;
@@ -52,6 +73,23 @@ export function Leads() {
       hour: "2-digit",
       minute: "2-digit",
     });
+  };
+
+  const formatTime = (value: string) => {
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return "--:--";
+    return parsed.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  };
+
+  const formatTimelineDay = (dateKey: string) => {
+    const date = new Date(`${dateKey}T12:00:00.000`);
+    const today = new Date();
+    const todayKey = today.toISOString().slice(0, 10);
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    const yesterdayKey = yesterday.toISOString().slice(0, 10);
+    const label = dateKey === todayKey ? "Hoje" : dateKey === yesterdayKey ? "Ontem" : date.toLocaleDateString("pt-BR", { weekday: "long" });
+    return `${label} — ${date.toLocaleDateString("pt-BR")}`;
   };
 
   const handleStatusChange = async (leadId: number, newStatus: LeadStatus) => {
@@ -137,7 +175,7 @@ export function Leads() {
           <SelectContent>
             <SelectItem value="todos">Todos os Status</SelectItem>
             <SelectItem value="NOVO">Novo</SelectItem>
-            <SelectItem value="ENCAMINHADO_HUMANO">Encaminhado</SelectItem>
+            <SelectItem value="ENCAMINHADO">Encaminhado</SelectItem>
             <SelectItem value="EM_CONTATO">Em Contato</SelectItem>
             <SelectItem value="CONVERTIDO">Convertido</SelectItem>
             <SelectItem value="PERDIDO">Perdido</SelectItem>
@@ -154,7 +192,7 @@ export function Leads() {
         </div>
         <div className="rounded-lg border border-purple-200 bg-purple-50 p-4">
           <p className="text-sm font-medium text-purple-600">Encaminhados</p>
-          <p className="text-2xl font-bold text-purple-700">{leadsNoPeriodo.filter((l) => getLeadStatus(l.id, l.status) === "ENCAMINHADO_HUMANO").length}</p>
+          <p className="text-2xl font-bold text-purple-700">{leadsNoPeriodo.filter((l) => getLeadStatus(l.id, l.status) === "ENCAMINHADO").length}</p>
         </div>
         <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4">
           <p className="text-sm font-medium text-yellow-600">Em Contato</p>
@@ -198,7 +236,7 @@ export function Leads() {
                     <TableCell>{formatChannel(lead)}</TableCell>
                     <TableCell>{lead.contatoExibicao ?? lead.contato ?? lead.telefone}</TableCell>
                     <TableCell>
-                      {splitInteresses(lead.interesse).length > 0 ? (
+                      {normalizeTimeline(lead).length > 0 ? (
                         <Button
                           type="button"
                           variant="outline"
@@ -207,9 +245,9 @@ export function Leads() {
                           onClick={() => setSelectedInterestLead(lead)}
                         >
                           <ListTree className="mr-2 h-4 w-4" />
-                          {splitInteresses(lead.interesse).length === 1
-                            ? "1 interesse"
-                            : `${splitInteresses(lead.interesse).length} interesses`}
+                          {normalizeTimeline(lead).length === 1
+                            ? "1 evento"
+                            : `${normalizeTimeline(lead).length} eventos`}
                         </Button>
                       ) : (
                         <span className="text-sm text-muted-foreground">Sem interesse</span>
@@ -241,7 +279,7 @@ export function Leads() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="NOVO">Novo</SelectItem>
-                          <SelectItem value="ENCAMINHADO_HUMANO">Encaminhado</SelectItem>
+                          <SelectItem value="ENCAMINHADO">Encaminhado</SelectItem>
                           <SelectItem value="EM_CONTATO">Em Contato</SelectItem>
                           <SelectItem value="CONVERTIDO">Convertido</SelectItem>
                           <SelectItem value="PERDIDO">Perdido</SelectItem>
@@ -257,33 +295,46 @@ export function Leads() {
       )}
 
       <Dialog open={Boolean(selectedInterestLead)} onOpenChange={(open) => !open && setSelectedInterestLead(null)}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Linha do tempo de interesses</DialogTitle>
+            <DialogTitle>Linha do tempo do lead</DialogTitle>
             <DialogDescription>
               {selectedInterestLead
-                ? `${selectedInterestLead.nome} demonstrou os interesses abaixo durante o atendimento.`
-                : "Interesses registrados durante o atendimento."}
+                ? `${selectedInterestLead.nome} tem uma timeline comercial de interesses, handoff e status.`
+                : "Eventos registrados durante o atendimento."}
             </DialogDescription>
           </DialogHeader>
 
           <div className="max-h-[60vh] overflow-y-auto pr-1">
-            <div className="space-y-0">
-              {splitInteresses(selectedInterestLead?.interesse).map((interesse, index, items) => (
-                <div key={`${interesse}-${index}`} className="grid grid-cols-[24px_minmax(0,1fr)] gap-3">
-                  <div className="flex flex-col items-center">
-                    <div className="mt-1 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-semibold text-white">
-                      {index + 1}
-                    </div>
-                    {index < items.length - 1 && <div className="h-full min-h-7 w-px bg-gray-200" />}
+            <div className="space-y-5">
+              {groupTimelineByDay(normalizeTimeline(selectedInterestLead)).map(([dateKey, events]) => (
+                <section key={dateKey} className="space-y-3">
+                  <div className="border-b pb-2 text-sm font-semibold text-gray-800">{formatTimelineDay(dateKey)}</div>
+                  <div className="space-y-0">
+                    {events.map((event, index) => {
+                      const style = getTimelineEventStyle(event);
+                      const Icon = style.icon;
+                      return (
+                        <div key={event.id} className="grid grid-cols-[64px_28px_minmax(0,1fr)] gap-3">
+                          <div className="pt-1 text-right text-xs font-medium text-muted-foreground">{formatTime(event.occurredAt)}</div>
+                          <div className="flex flex-col items-center">
+                            <div className={`flex h-7 w-7 items-center justify-center rounded-full border ${style.className}`}>
+                              <Icon className="h-3.5 w-3.5" />
+                            </div>
+                            {index < events.length - 1 && <div className="h-full min-h-8 w-px bg-gray-200" />}
+                          </div>
+                          <div className="pb-5">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-sm font-medium text-gray-900">{event.title}</p>
+                              <span className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${style.className}`}>{style.label}</span>
+                            </div>
+                            <p className="mt-1 text-xs leading-5 text-muted-foreground">{event.description}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                  <div className="pb-5">
-                    <p className="text-sm font-medium text-gray-900">{interesse}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {index === 0 ? "Primeiro interesse registrado" : `Interesse registrado depois do item ${index}`}
-                    </p>
-                  </div>
-                </div>
+                </section>
               ))}
             </div>
           </div>
