@@ -40,6 +40,26 @@ type ProcessedMessageResult =
   | { kind: "suppressed" }
   | { kind: "error" };
 
+const CONVERSATION_STAGES = new Set<ChatbotConversationState["stage"]>([
+  "IDLE",
+  "MENU_PRINCIPAL",
+  "AGUARDANDO_CATEGORIA",
+  "CONSULTANDO_PRODUTOS",
+  "AGUARDANDO_ESCOLHA_PRODUTO",
+  "AGUARDANDO_NOME_CLIENTE",
+  "ENCAMINHADO_HUMANO",
+]);
+
+const CHATBOT_INTENTS = new Set<ChatbotIntent>([
+  "greeting",
+  "menu",
+  "products",
+  "promotions",
+  "lead_interest",
+  "human_handoff",
+  "unknown",
+]);
+
 function createDefaultLogger(): LoggerLike {
   return {
     info(payload, message) {
@@ -201,6 +221,36 @@ export class ChatbotCoreService {
 
   resumeConversation(phoneNumber: string): void {
     this.stateStore.resumeBot(phoneNumber);
+  }
+
+  hydrateConversationState(
+    phoneNumber: string,
+    state?: {
+      stage?: string | null;
+      intent?: string | null;
+      handoffRequested?: boolean | null;
+    } | null,
+  ): void {
+    if (!state) {
+      return;
+    }
+
+    const patch: Partial<ChatbotConversationState> = {};
+    if (state.stage && CONVERSATION_STAGES.has(state.stage as ChatbotConversationState["stage"])) {
+      patch.stage = state.stage as ChatbotConversationState["stage"];
+    }
+
+    if (state.intent && CHATBOT_INTENTS.has(state.intent as ChatbotIntent)) {
+      patch.lastIntent = state.intent as ChatbotIntent;
+    }
+
+    if (state.handoffRequested !== null && state.handoffRequested !== undefined) {
+      patch.handoffRequested = Boolean(state.handoffRequested);
+    }
+
+    if (Object.keys(patch).length > 0) {
+      this.stateStore.hydrate(phoneNumber, patch);
+    }
   }
 
   private resolveSelectedProductName(normalizedText: string, productNames: string[]): string | undefined {

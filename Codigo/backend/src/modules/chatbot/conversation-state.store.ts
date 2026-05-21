@@ -30,6 +30,17 @@ export class ConversationStateStore {
     return initial;
   }
 
+  hydrate(phoneNumber: string, patch: Partial<ChatbotConversationState>): ChatbotConversationState {
+    const current = this.getOrCreate(phoneNumber);
+    const next: ChatbotConversationState = {
+      ...current,
+      ...patch,
+      phoneNumber,
+    };
+    this.states.set(phoneNumber, next);
+    return next;
+  }
+
   update(
     phoneNumber: string,
     input: {

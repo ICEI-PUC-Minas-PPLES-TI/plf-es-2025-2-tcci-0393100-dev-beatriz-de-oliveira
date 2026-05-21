@@ -21,6 +21,7 @@ function service(response: ChatbotResponse, products = [product()]) {
     }),
     pauseConversation: vi.fn(),
     resumeConversation: vi.fn(),
+    hydrateConversationState: vi.fn(),
   };
   const repository = {
     getConversationAutomationStateByChatId: vi.fn().mockResolvedValue(null),
@@ -122,5 +123,27 @@ describe("TelegramService", () => {
 
     expect(chatbotCore.pauseConversation).toHaveBeenCalledWith("123");
     expect(result.messageResults?.[0]?.status).toBe("suppressed");
+  });
+
+  it("hidrata estado persistido antes de processar nova mensagem", async () => {
+    const response = { intent: "products", handler: "test", replyText: "ok", actions: [], handoffRequested: false } as ChatbotResponse;
+    const { telegram, chatbotCore, repository } = service(response);
+    repository.getConversationAutomationStateByChatId.mockResolvedValueOnce({
+      atendimentoId: 7,
+      chatId: "123",
+      status: "ATIVO",
+      handoffRequested: false,
+      stage: "AGUARDANDO_CATEGORIA",
+      intent: "products",
+    });
+
+    await telegram.processWebhookEvent({ message: { message_id: 1, chat: { id: 123 }, text: "Brinquedos" } });
+
+    expect(chatbotCore.hydrateConversationState).toHaveBeenCalledWith("123", expect.objectContaining({
+      stage: "AGUARDANDO_CATEGORIA",
+      intent: "products",
+      handoffRequested: false,
+    }));
+    expect(chatbotCore.processIncomingMessages).toHaveBeenCalled();
   });
 });

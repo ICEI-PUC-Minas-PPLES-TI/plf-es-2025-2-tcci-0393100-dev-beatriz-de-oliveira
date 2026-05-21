@@ -139,6 +139,7 @@ export class TelegramService {
     });
 
     const runtimeState = await this.repository.getConversationAutomationStateByChatId(message.from);
+    this.chatbotCore.hydrateConversationState(message.from, runtimeState);
     const isHumanHandoffActive = Boolean(
       runtimeState &&
         runtimeState.status !== "ENCERRADO" &&

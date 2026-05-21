@@ -16,7 +16,13 @@
   },
   "include": ["src"],
   "exclude": [
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "src/test/**",
     "src/scripts",
-    "src/jobs"
+    "src/jobs",
+    "coverage",
+    "dist",
+    "node_modules"
   ]
 }
