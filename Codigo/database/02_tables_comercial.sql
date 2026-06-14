@@ -5,9 +5,13 @@ create table if not exists public.produtos (
   preco decimal(10,2) not null,
   disponibilidade boolean not null default true,
   categoria varchar(100),
+  quantidade int not null default 0,
   criado_em timestamp not null default now(),
   atualizado_em timestamp not null default now()
 );
+
+alter table public.produtos
+  add column if not exists quantidade int not null default 0;
 
 create table if not exists public.pedidos (
   pedido_id uuid primary key default gen_random_uuid(),

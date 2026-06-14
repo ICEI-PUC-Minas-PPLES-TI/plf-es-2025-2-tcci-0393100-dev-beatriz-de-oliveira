@@ -14,12 +14,25 @@ create unique index if not exists idx_product_images_one_primary
   on public.product_images(product_id)
   where principal;
 
-insert into public.product_images (product_id, image_url, ordem, principal)
-select p.produto_id, p.imagem, 0, true
-from public.produtos p
-where nullif(trim(coalesce(p.imagem, '')), '') is not null
-  and not exists (
+do $$
+begin
+  if exists (
     select 1
-    from public.product_images pi
-    where pi.product_id = p.produto_id
-  );
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'produtos'
+      and column_name = 'imagem'
+  ) then
+    execute $migration$
+      insert into public.product_images (product_id, image_url, ordem, principal)
+      select p.produto_id, p.imagem, 0, true
+      from public.produtos p
+      where nullif(trim(coalesce(p.imagem, '')), '') is not null
+        and not exists (
+          select 1
+          from public.product_images pi
+          where pi.product_id = p.produto_id
+        )
+    $migration$;
+  end if;
+end $$;

@@ -43,3 +43,9 @@ drop index if exists public.idx_mensagens_whatsapp_message_id;
 
 create unique index if not exists idx_mensagens_telegram_message_id
   on public.mensagens(telegram_message_id);
+
+alter table public.atendimentos
+  drop column if exists whatsapp_chat_id;
+
+alter table public.mensagens
+  drop column if exists whatsapp_message_id;

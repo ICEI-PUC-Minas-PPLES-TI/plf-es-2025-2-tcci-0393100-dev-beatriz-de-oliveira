@@ -5,7 +5,9 @@ create index if not exists idx_atendimentos_cliente_id on public.atendimentos(cl
 create index if not exists idx_atendimentos_lead_id on public.atendimentos(lead_id);
 create index if not exists idx_atendimentos_status on public.atendimentos(status);
 create index if not exists idx_atendimentos_estado_conversa on public.atendimentos(estado_conversa);
+create index if not exists idx_atendimentos_telegram_chat_id on public.atendimentos(telegram_chat_id);
 create index if not exists idx_mensagens_atendimento_id on public.mensagens(atendimento_id);
 create unique index if not exists idx_mensagens_telegram_message_id on public.mensagens(telegram_message_id);
 create index if not exists idx_produtos_categoria on public.produtos(categoria);
 create index if not exists idx_pedidos_cliente_id on public.pedidos(cliente_id);
+create unique index if not exists administrators_login_unique_idx on public.administrators(lower(login));
