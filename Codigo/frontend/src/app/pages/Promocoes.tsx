@@ -22,11 +22,10 @@ import { Badge } from "../components/ui/badge";
 import { ImageWithFallback } from "../components/ImageWithFallback";
 import { useProdutosLookup, usePromocoesData } from "../hooks/useAdminData";
 import { adminDataService } from "../services/adminDataService";
-import type { Promocao, PromocaoTipo } from "../types/domain";
+import type { Promocao } from "../types/domain";
 
 interface PromocaoFormData {
   produto_id: string;
-  tipo: PromocaoTipo;
   desconto: string;
   ativa: boolean;
   inicio_em: string;
@@ -35,7 +34,6 @@ interface PromocaoFormData {
 
 const EMPTY_FORM: PromocaoFormData = {
   produto_id: "",
-  tipo: "PROMOCAO",
   desconto: "0",
   ativa: true,
   inicio_em: "",
@@ -116,7 +114,6 @@ function formatDiscount(value: string): string {
 
 export function Promocoes() {
   const { data: promocoes, isLoading, error, reload } = usePromocoesData();
-  const [filtroTipo, setFiltroTipo] = useState("todos");
   const [filtroAtiva, setFiltroAtiva] = useState("todos");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [produtoSearch, setProdutoSearch] = useState("");
@@ -131,22 +128,18 @@ export function Promocoes() {
   const filteredPromocoes = useMemo(
     () =>
       promocoes.filter((promo) => {
-        const matchesTipo = filtroTipo === "todos" || promo.tipo === filtroTipo;
         const status = getPromocaoStatus(promo);
         const matchesAtiva = filtroAtiva === "todos" || filtroAtiva === status;
-        return matchesTipo && matchesAtiva;
+        return promo.tipo === "PROMOCAO" && matchesAtiva;
       }),
-    [filtroAtiva, filtroTipo, promocoes],
+    [filtroAtiva, promocoes],
   );
-
-  const isPromocaoTipo = (value: string): value is PromocaoTipo => value === "PROMOCAO" || value === "DESTAQUE";
 
   const handleOpenDialog = (promocao?: Promocao) => {
     if (promocao) {
       setEditingId(promocao.id);
       setFormData({
         produto_id: promocao.produto_id.toString(),
-        tipo: promocao.tipo,
         desconto: promocao.desconto ?? "0",
         ativa: promocao.ativa,
         inicio_em: promocao.inicio_em,
@@ -183,7 +176,7 @@ export function Promocoes() {
       produto_id: produtoId,
       produto: produto.nome,
       imagem: produto.imagem,
-      tipo: formData.tipo,
+      tipo: "PROMOCAO" as const,
       desconto: normalizeDiscount(formData.desconto),
       ativa: formData.ativa,
       inicio_em: formData.inicio_em,
@@ -228,8 +221,8 @@ export function Promocoes() {
     <div className="space-y-6">
       <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Promoções e Destaques</h2>
-          <p className="mt-1 text-muted-foreground">Gerencie ofertas e produtos em destaque</p>
+          <h2 className="text-2xl font-bold text-gray-900">Promoções</h2>
+          <p className="mt-1 text-muted-foreground">Gerencie as promoções dos produtos</p>
           {error && <p className="mt-2 text-sm text-red-600">Erro ao carregar promoções: {error}</p>}
         </div>
         <Button onClick={() => handleOpenDialog()} className="shadow-md">
@@ -238,18 +231,7 @@ export function Promocoes() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <Select value={filtroTipo} onValueChange={setFiltroTipo}>
-          <SelectTrigger>
-            <SelectValue placeholder="Tipo de promoção" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">Todos os Tipos</SelectItem>
-            <SelectItem value="PROMOCAO">Promoção</SelectItem>
-            <SelectItem value="DESTAQUE">Destaque</SelectItem>
-          </SelectContent>
-        </Select>
-
+      <div className="max-w-sm">
         <Select value={filtroAtiva} onValueChange={setFiltroAtiva}>
           <SelectTrigger>
             <SelectValue placeholder="Status" />
@@ -280,9 +262,7 @@ export function Promocoes() {
                   <Badge className={getPromocaoStatusClass(status)}>{getPromocaoStatusLabel(status)}</Badge>
                 </div>
                 <div className="absolute top-3 left-3">
-                  <Badge className={promo.tipo === "PROMOCAO" ? "bg-red-500" : "bg-yellow-500"}>
-                    {promo.tipo === "PROMOCAO" ? "PROMOÇÃO" : "DESTAQUE"}
-                  </Badge>
+                  <Badge className="bg-red-500">PROMOÇÃO</Badge>
                 </div>
               </div>
               <CardHeader>
@@ -319,7 +299,7 @@ export function Promocoes() {
               <Tag className="mr-2 h-5 w-5 text-primary" />
               {editingId ? "Editar Promoção" : "Nova Promoção"}
             </DialogTitle>
-            <DialogDescription>Configure a promoção ou destaque do produto</DialogDescription>
+            <DialogDescription>Configure a promoção do produto</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
@@ -342,26 +322,6 @@ export function Promocoes() {
                   <option key={produto.id} value={produto.nome} />
                 ))}
               </datalist>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="tipo">Tipo *</Label>
-              <Select
-                value={formData.tipo}
-                onValueChange={(value) => {
-                  if (isPromocaoTipo(value)) {
-                    setFormData({ ...formData, tipo: value });
-                  }
-                }}
-              >
-                <SelectTrigger id="tipo">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="PROMOCAO">Promoção</SelectItem>
-                  <SelectItem value="DESTAQUE">Destaque</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
 
             <div className="space-y-2">
