@@ -11,22 +11,18 @@ authors:
   # Orientadores e professores mencionados no TCC
   - family-names: "Maia"
     given-names: "Danilo de Quadros"
-    name-suffix: "Professor"
     affiliation: "PUC Minas"
 
   - family-names: "Cardoso"
     given-names: "Leonardo Vilela"
-    name-suffix: "Professor"
     affiliation: "PUC Minas"
 
   - family-names: "Costa"
     given-names: "Raphael Ramos Dias"
-    name-suffix: "Professor"
     affiliation: "PUC Minas"
 
   - family-names: "Tavares"
     given-names: "Cleiton Silva"
-    name-suffix: "Professor"
     affiliation: "PUC Minas"
 
   - family-names: "Costa"
