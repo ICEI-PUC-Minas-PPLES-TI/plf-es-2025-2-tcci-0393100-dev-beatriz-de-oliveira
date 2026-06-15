@@ -29,6 +29,10 @@ authors:
     name-suffix: "Professor"
     affiliation: "PUC Minas"
 
+  - family-names: "Costa"
+    given-names: "Marco Rodrigo"
+    affiliation: "PUC Minas"
+
 keywords:
   - "chatbot"
   - "whatsapp"
